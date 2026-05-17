@@ -1,0 +1,471 @@
+/* ============================================
+   Configurator Page Layout
+   ============================================ */
+
+#configurator-page {
+    display: none;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+}
+
+#configurator-page.active {
+    display: flex;
+}
+
+/* Top Bar */
+.config-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-md) var(--space-lg);
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-subtle);
+    z-index: var(--z-topbar);
+    flex-shrink: 0;
+}
+
+.topbar-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px; height: 36px;
+    border-radius: var(--radius-md);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    transition: all var(--duration-fast) var(--ease-out);
+}
+
+.topbar-btn:hover {
+    background: var(--bg-hover);
+    border-color: var(--border-medium);
+}
+
+.topbar-title {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 0.85rem;
+    letter-spacing: 3px;
+}
+
+.topbar-status {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    letter-spacing: 1px;
+}
+
+/* Main Layout */
+.config-layout {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+}
+
+/* Left: Mechanism Panel */
+.mechanism-panel {
+    width: 320px;
+    flex-shrink: 0;
+    background: var(--bg-secondary);
+    border-right: 1px solid var(--border-subtle);
+    overflow-y: auto;
+    padding: var(--space-lg);
+    z-index: var(--z-panel);
+}
+
+.panel-header {
+    margin-bottom: var(--space-xl);
+}
+
+.panel-title {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 1.2rem;
+    letter-spacing: 3px;
+}
+
+.panel-subtitle {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin-top: var(--space-xs);
+    letter-spacing: 1px;
+}
+
+/* Mechanism Sections */
+.mechanism-section {
+    margin-bottom: var(--space-xl);
+}
+
+.section-label {
+    font-family: var(--font-display);
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 3px;
+    color: var(--text-tertiary);
+    margin-bottom: var(--space-md);
+    padding-bottom: var(--space-xs);
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+/* Mechanism Cards */
+.mechanism-card {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    padding: var(--space-md);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    cursor: pointer;
+    transition: all var(--duration-normal) var(--ease-out);
+    margin-bottom: var(--space-sm);
+    position: relative;
+    overflow: hidden;
+}
+
+.mechanism-card::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0;
+    width: 3px; height: 100%;
+    background: transparent;
+    transition: background var(--duration-normal) var(--ease-out);
+}
+
+.mechanism-card:hover {
+    background: var(--bg-elevated);
+    border-color: var(--border-medium);
+    transform: translateX(4px);
+}
+
+.mechanism-card:hover::before {
+    background: var(--accent-red);
+}
+
+.mechanism-card.selected {
+    border-color: var(--accent-red);
+    box-shadow: 0 0 20px rgba(213, 0, 28, 0.1);
+}
+
+.mechanism-card.selected::before {
+    background: var(--accent-red);
+}
+
+.mechanism-card.configured {
+    border-color: rgba(76, 175, 80, 0.3);
+}
+
+.mechanism-card.configured::before {
+    background: #4CAF50;
+}
+
+.card-icon-wrap {
+    width: 40px; height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.card-icon {
+    width: 32px; height: 32px;
+    color: var(--text-secondary);
+    transition: color var(--duration-normal) var(--ease-out);
+}
+
+.mechanism-card:hover .card-icon,
+.mechanism-card.selected .card-icon {
+    color: var(--accent-red);
+}
+
+.mechanism-card.configured .card-icon {
+    color: #4CAF50;
+}
+
+.card-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.card-name {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 0.85rem;
+    letter-spacing: 1px;
+}
+
+.card-desc {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.card-status {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: transparent;
+    transition: background var(--duration-normal) var(--ease-out);
+}
+
+.mechanism-card.configured .card-status {
+    background: #4CAF50;
+    box-shadow: 0 0 8px rgba(76, 175, 80, 0.4);
+}
+
+.mechanism-cards-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+/* Center: Robot Viewport */
+.robot-viewport {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    background: var(--bg-primary);
+    background-image:
+        radial-gradient(circle at 50% 50%, rgba(213, 0, 28, 0.03) 0%, transparent 60%),
+        radial-gradient(circle at 20% 80%, rgba(201, 169, 110, 0.02) 0%, transparent 40%);
+    overflow: hidden;
+}
+
+.viewport-label {
+    position: absolute;
+    top: var(--space-lg);
+    left: var(--space-lg);
+    font-family: var(--font-display);
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 3px;
+    color: var(--text-tertiary);
+}
+
+.robot-canvas {
+    width: 90%;
+    max-width: 800px;
+    height: auto;
+    transition: transform var(--duration-slow) var(--ease-out);
+}
+
+/* Robot SVG Silhouettes */
+.mech-sil {
+    fill: rgba(255, 255, 255, 0.08);
+    stroke: rgba(255, 255, 255, 0.12);
+    stroke-width: 1.5;
+    stroke-dasharray: 4 4;
+    cursor: pointer;
+    transition: all var(--duration-normal) var(--ease-out);
+}
+
+.mech-sil:hover {
+    fill: rgba(213, 0, 28, 0.1);
+    stroke: rgba(213, 0, 28, 0.4);
+    filter: url(#glow);
+}
+
+.mech-sil.configured {
+    fill: rgba(76, 175, 80, 0.15);
+    stroke: rgba(76, 175, 80, 0.5);
+    stroke-dasharray: none;
+}
+
+.sil-label {
+    font-family: var(--font-display);
+    font-size: 9px;
+    fill: rgba(255, 255, 255, 0.25);
+    letter-spacing: 2px;
+    font-weight: 600;
+    pointer-events: none;
+}
+
+.mech-sil:hover .sil-label {
+    fill: rgba(213, 0, 28, 0.6);
+}
+
+.mech-sil.configured .sil-label {
+    fill: rgba(76, 175, 80, 0.6);
+}
+
+.sil-part {
+    fill: rgba(255, 255, 255, 0.1);
+    stroke: rgba(255, 255, 255, 0.15);
+    stroke-width: 1;
+}
+
+.chassis-sil {
+    fill: rgba(255, 255, 255, 0.12);
+    stroke: rgba(255, 255, 255, 0.18);
+}
+
+.wheel-sil {
+    fill: rgba(255, 255, 255, 0.08);
+    stroke: rgba(255, 255, 255, 0.12);
+}
+
+/* Viewport zoom state */
+.robot-canvas.zoomed {
+    transform: scale(1.8);
+}
+
+.viewport-hint {
+    position: absolute;
+    bottom: var(--space-xl);
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.7rem;
+    color: var(--text-tertiary);
+    letter-spacing: 1px;
+    animation: pulse 2s ease-in-out infinite;
+}
+
+/* Bottom Bar */
+.config-bottombar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-md) var(--space-lg);
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border-subtle);
+    flex-shrink: 0;
+    gap: var(--space-lg);
+}
+
+.progress-bar {
+    flex: 1;
+    height: 3px;
+    background: var(--bg-hover);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--accent-red), var(--accent-red-hover));
+    border-radius: 2px;
+    transition: width var(--duration-normal) var(--ease-out);
+}
+
+.bottom-actions {
+    display: flex;
+    gap: var(--space-md);
+    flex-shrink: 0;
+}
+
+.btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-xl);
+    background: var(--accent-red);
+    color: white;
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 0.75rem;
+    letter-spacing: 2px;
+    border-radius: var(--radius-sm);
+    transition: all var(--duration-normal) var(--ease-out);
+}
+
+.btn-primary:hover {
+    background: var(--accent-red-hover);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-accent);
+}
+
+.btn-primary:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.btn-secondary {
+    padding: var(--space-sm) var(--space-lg);
+    background: transparent;
+    color: var(--text-secondary);
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: 0.75rem;
+    letter-spacing: 2px;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    transition: all var(--duration-normal) var(--ease-out);
+}
+
+.btn-secondary:hover {
+    border-color: var(--border-medium);
+    color: var(--text-primary);
+    background: var(--bg-surface);
+}
+
+/* Modal */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(8px);
+    z-index: var(--z-modal);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.3s var(--ease-out);
+}
+
+.modal-content {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-medium);
+    border-radius: var(--radius-xl);
+    width: 90%;
+    max-width: 500px;
+    overflow: hidden;
+    box-shadow: var(--shadow-lg);
+    animation: fadeInUp 0.4s var(--ease-spring);
+}
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-xl);
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.modal-header h2 {
+    font-family: var(--font-display);
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 2px;
+}
+
+.modal-body {
+    padding: var(--space-2xl);
+}
+
+.gen-progress {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-lg);
+}
+
+.gen-spinner {
+    width: 40px; height: 40px;
+    border: 3px solid var(--border-subtle);
+    border-top-color: var(--accent-red);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+#gen-status-text {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    text-align: center;
+}
