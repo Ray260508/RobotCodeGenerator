@@ -46,6 +46,7 @@ export function renderSidebar(type) {
         case 'intake': return renderIntake(s, title, content);
         case 'roller': return renderRoller(s, title, content);
         case 'launcher': return renderLauncher(s, title, content);
+        case 'arm': return renderArm(s, title, content);
         case 'vision': return renderVision(s, title, content);
         case 'statemachine': return renderStateMachine(s, title, content);
     }
@@ -337,39 +338,7 @@ function renderRoller(s, title, content) {
 
 function renderLauncher(s, title, content) {
     const m = s.mechanisms.launcher;
-    
-    const extraTop = `
-        <div class="config-section-title" style="margin-top:0">LAUNCHER TYPE</div>
-        <div class="config-group">
-            ${radioCards([
-                ['simple', {name: 'Simple Motor', desc: 'Rollers / single motor grab'}],
-                ['arm_claw', {name: 'Arm + Claw', desc: 'Pivot arm with claw motor'}]
-            ], m.launcherType, 'launcherType')}
-        </div>
-        <div class="config-divider"></div>
-        <div class="config-section-title" style="margin-bottom:-10px">${m.launcherType === 'arm_claw' ? 'ARM MOTORS' : 'MOTORS'}</div>
-    `;
-
-    let clawHtml = '';
-    if (m.launcherType === 'arm_claw') {
-        const cm = m.clawMotor || { type: null, canId: 26, inverted: false };
-        clawHtml = `
-            <div class="config-divider"></div>
-            <div class="config-section-title">CLAW MOTOR</div>
-            <div class="config-row">
-                <div class="config-group"><label class="config-label">Motor Type</label>${motorSelect('cfg-launcher-claw-motor', cm.type)}</div>
-                ${canIdInput('cfg-launcher-claw-canid', 'CAN ID', cm.canId)}
-            </div>
-            <div class="config-row">
-                <div class="config-group config-group-sm"><label class="config-label">
-                    <input type="checkbox" class="config-check" id="cfg-launcher-claw-inv" ${cm.inverted?'checked':''}>
-                    Inverted</label></div>
-            </div>
-        `;
-    }
-
     renderMech(s, title, content, 'launcher', 'Launcher', `
-        ${clawHtml}
         <div class="config-divider"></div>
         <div class="config-section-title">SOFT LIMITS</div>
         <div class="config-row">
@@ -385,16 +354,134 @@ function renderLauncher(s, title, content) {
             <select class="config-select" id="cfg-launcher-sensor-type">${opts(SENSOR_PORT_TYPES,m.sensorPortType)}</select></div>
             ${numInput('cfg-launcher-sensor-port','Port Number',m.sensorPort,'1')}
         </div>
-    `, extraTop);
-
-    bindRadio('launcherType', t => {
-        appState.updateMechanism('launcher', { launcherType: t });
-        renderSidebar('launcher');
-    });
+    `);
     
     document.getElementById('cfg-launcher-sensor')?.addEventListener('change', e => {
         document.getElementById('launcher-sensor-cfg').style.display = e.target.checked?'':'none';
     });
+}
+
+function renderArm(s, title, content) {
+    const m = s.mechanisms.arm;
+    title.textContent = 'ARM';
+
+    let html = `
+        <div class="config-section-title" style="margin-top:0">DEGREES OF FREEDOM</div>
+        <div class="config-group">
+            <select class="config-select" id="cfg-arm-dof">
+                <option value="1" ${m.dof === 1 ? 'selected' : ''}>1 DoF (Single Joint)</option>
+                <option value="2" ${m.dof === 2 ? 'selected' : ''}>2 DoF (Double Jointed)</option>
+                <option value="3" ${m.dof === 3 ? 'selected' : ''}>3 DoF (Triple Jointed)</option>
+            </select>
+        </div>
+    `;
+
+    for (let i = 0; i < m.dof; i++) {
+        const j = m.joints[i] || {
+            motors: [{ type: null, canId: 30 + i * 2, inverted: false, role: 'leader' }],
+            encoder: null, encoderId: 31 + i * 2,
+            gearRatio: null,
+            motorConfig: { currentLimit: 40, brakeMode: true },
+            pid: { kP: 0, kI: 0, kD: 0, kS: 0, kV: 0, kA: 0 },
+            softLimitFwd: null, softLimitRev: null
+        };
+        const lead = j.motors[0] || { type: null, canId: 30 + i * 2, inverted: false };
+        const hasFollower = j.motors.length > 1;
+        const follow = j.motors[1] || { type: null, canId: 31 + i * 2, inverted: false };
+
+        html += `
+            <div class="config-divider"></div>
+            <div class="config-section-title" style="color: var(--accent-red); font-size: 0.95rem;">JOINT ${i + 1}</div>
+            
+            <div class="config-group"><label class="config-label">Leader Motor Type</label>${motorSelect(`cfg-arm-joint-${i}-leader-motor`, lead.type)}</div>
+            <div class="config-row">
+                ${canIdInput(`cfg-arm-joint-${i}-leader-canid`, 'Leader CAN ID', lead.canId)}
+                <div class="config-group config-group-sm" style="align-items: center; justify-content: center; height: 38px;">
+                    <label class="config-label"><input type="checkbox" id="cfg-arm-joint-${i}-leader-inv" ${lead.inverted ? 'checked' : ''}> Inverted</label>
+                </div>
+            </div>
+
+            <div class="config-group">
+                <div class="config-toggle-wrap">
+                    <span class="config-toggle-label">Has Follower Motor</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="cfg-arm-joint-${i}-hasfollower" ${hasFollower ? 'checked' : ''}>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <div id="cfg-arm-joint-${i}-follower-cfg" style="${hasFollower ? '' : 'display:none'}">
+                <div class="config-group"><label class="config-label">Follower Motor Type</label>${motorSelect(`cfg-arm-joint-${i}-follower-motor`, follow.type)}</div>
+                <div class="config-row">
+                    ${canIdInput(`cfg-arm-joint-${i}-follower-canid`, 'Follower CAN ID', follow.canId)}
+                    <div class="config-group config-group-sm" style="align-items: center; justify-content: center; height: 38px;">
+                        <label class="config-label"><input type="checkbox" id="cfg-arm-joint-${i}-follower-inv" ${follow.inverted ? 'checked' : ''}> Inverted</label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="config-row">
+                ${numInput(`cfg-arm-joint-${i}-ratio`, 'Gear Ratio', j.gearRatio, 'e.g. 80')}
+                ${numInput(`cfg-arm-joint-${i}-curlimit`, 'Current Limit (A)', j.motorConfig.currentLimit, '40')}
+            </div>
+
+            <!-- Encoder -->
+            <div class="config-row">
+                <div class="config-group">
+                    <label class="config-label">Encoder Type</label>
+                    <select class="config-select" id="cfg-arm-joint-${i}-encoder">
+                        <option value="">Integrated</option>
+                        <option value="cancoder" ${j.encoder === 'cancoder' ? 'selected' : ''}>CANCoder</option>
+                        <option value="throughbore" ${j.encoder === 'throughbore' ? 'selected' : ''}>ThroughBore</option>
+                    </select>
+                </div>
+                ${canIdInput(`cfg-arm-joint-${i}-encoder-id`, 'Encoder ID/Port', j.encoderId)}
+            </div>
+
+            <!-- Soft Limits -->
+            <div class="config-row">
+                ${numInput(`cfg-arm-joint-${i}-softfwd`, 'Soft Limit Fwd (rad)', j.softLimitFwd, 'None', '0.01')}
+                ${numInput(`cfg-arm-joint-${i}-softrev`, 'Soft Limit Rev (rad)', j.softLimitRev, 'None', '0.01')}
+            </div>
+
+            <!-- PID -->
+            <div class="config-row">
+                ${numInput(`cfg-arm-joint-${i}-kp`, 'kP', j.pid.kP, '0')}
+                ${numInput(`cfg-arm-joint-${i}-ki`, 'kI', j.pid.kI, '0')}
+                ${numInput(`cfg-arm-joint-${i}-kd`, 'kD', j.pid.kD, '0')}
+            </div>
+        `;
+    }
+
+    html += simulationAttachSelect('arm', m, s.attachmentRules);
+
+    content.innerHTML = html;
+
+    // DOF Event Listener
+    document.getElementById('cfg-arm-dof')?.addEventListener('change', e => {
+        const val = parseInt(e.target.value);
+        const newJoints = [];
+        for (let i = 0; i < val; i++) {
+            newJoints.push(m.joints[i] || {
+                motors: [{ type: null, canId: 30 + i * 2, inverted: false, role: 'leader' }],
+                encoder: null, encoderId: 31 + i * 2,
+                gearRatio: null,
+                motorConfig: { currentLimit: 40, brakeMode: true },
+                pid: { kP: 0, kI: 0, kD: 0, kS: 0, kV: 0, kA: 0 },
+                softLimitFwd: null, softLimitRev: null
+            });
+        }
+        appState.updateMechanism('arm', { dof: val, joints: newJoints });
+        renderSidebar('arm');
+    });
+
+    // Follower toggles
+    for (let i = 0; i < m.dof; i++) {
+        document.getElementById(`cfg-arm-joint-${i}-hasfollower`)?.addEventListener('change', e => {
+            document.getElementById(`cfg-arm-joint-${i}-follower-cfg`).style.display = e.target.checked ? '' : 'none';
+        });
+    }
 }
 
 // ===== VISION =====
@@ -601,18 +688,54 @@ export function applySidebarConfig(type) {
             u.sensorPort = parseInt(document.getElementById('cfg-intake-sensor-port')?.value) || 0;
         }
         if (type === 'launcher') {
-            if (m.launcherType === 'arm_claw') {
-                u.clawMotor = {
-                    type: document.getElementById('cfg-launcher-claw-motor')?.value || null,
-                    canId: parseInt(document.getElementById('cfg-launcher-claw-canid')?.value) || 26,
-                    inverted: document.getElementById('cfg-launcher-claw-inv')?.checked || false,
-                };
-            }
             u.softLimitFwd = parseFloat(document.getElementById('cfg-launcher-softfwd')?.value) || null;
             u.softLimitRev = parseFloat(document.getElementById('cfg-launcher-softrev')?.value) || null;
             u.hasSensor = document.getElementById('cfg-launcher-sensor')?.checked || false;
             u.sensorPortType = document.getElementById('cfg-launcher-sensor-type')?.value || 'dio';
             u.sensorPort = parseInt(document.getElementById('cfg-launcher-sensor-port')?.value) || 1;
+        }
+        if (type === 'arm') {
+            const dof = parseInt(document.getElementById('cfg-arm-dof')?.value) || m.dof;
+            const joints = [];
+            for (let i = 0; i < dof; i++) {
+                const hasFollower = document.getElementById(`cfg-arm-joint-${i}-hasfollower`)?.checked || false;
+                const motors = [
+                    {
+                        type: document.getElementById(`cfg-arm-joint-${i}-leader-motor`)?.value || null,
+                        canId: parseInt(document.getElementById(`cfg-arm-joint-${i}-leader-canid`)?.value) || (30 + i * 2),
+                        inverted: document.getElementById(`cfg-arm-joint-${i}-leader-inv`)?.checked || false,
+                        role: 'leader'
+                    }
+                ];
+                if (hasFollower) {
+                    motors.push({
+                        type: document.getElementById(`cfg-arm-joint-${i}-follower-motor`)?.value || null,
+                        canId: parseInt(document.getElementById(`cfg-arm-joint-${i}-follower-canid`)?.value) || (31 + i * 2),
+                        inverted: document.getElementById(`cfg-arm-joint-${i}-follower-inv`)?.checked || false,
+                        role: 'follower'
+                    });
+                }
+                joints.push({
+                    motors,
+                    gearRatio: parseFloat(document.getElementById(`cfg-arm-joint-${i}-ratio`)?.value) || null,
+                    encoder: document.getElementById(`cfg-arm-joint-${i}-encoder`)?.value || null,
+                    encoderId: parseInt(document.getElementById(`cfg-arm-joint-${i}-encoder-id`)?.value) || (31 + i * 2),
+                    motorConfig: {
+                        currentLimit: parseInt(document.getElementById(`cfg-arm-joint-${i}-curlimit`)?.value) || 40,
+                        brakeMode: true
+                    },
+                    softLimitFwd: parseFloat(document.getElementById(`cfg-arm-joint-${i}-softfwd`)?.value) || null,
+                    softLimitRev: parseFloat(document.getElementById(`cfg-arm-joint-${i}-softrev`)?.value) || null,
+                    pid: {
+                        kP: parseFloat(document.getElementById(`cfg-arm-joint-${i}-kp`)?.value) || 0,
+                        kI: parseFloat(document.getElementById(`cfg-arm-joint-${i}-ki`)?.value) || 0,
+                        kD: parseFloat(document.getElementById(`cfg-arm-joint-${i}-kd`)?.value) || 0,
+                        kS: 0, kV: 0, kA: 0
+                    }
+                });
+            }
+            u.dof = dof;
+            u.joints = joints;
         }
         appState.updateMechanism(type, u);
     } else if (type==='vision') {

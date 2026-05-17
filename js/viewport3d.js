@@ -168,7 +168,6 @@ function buildPlaceholderRobot() {
 
     // === SHOOTER (Initial Placeholder) ===
     const shootGrp = new THREE.Group();
-    const sp = POSITIONS.shooter;
     buildShooterPlaceholder('adjustable', shootGrp);
     mechGroups.shooter = shootGrp;
     robotGroup.add(shootGrp);
@@ -190,19 +189,10 @@ function buildPlaceholderRobot() {
 
     // === ROLLER ===
     const rolGrp = new THREE.Group();
-    const rp = POSITIONS.roller;
-    [-0.1, 0.1].forEach(dz => {
-        const r = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.28, 12), mat(COLORS.roller));
-        r.rotation.x = Math.PI / 2;
-        r.position.set(rp.x, rp.y, rp.z + dz);
-        r.castShadow = true;
-        rolGrp.add(r);
-    });
-    const rFrame = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.1, 0.3), mat(COLORS.roller, 0.5));
-    rFrame.position.set(rp.x, rp.y + 0.06, rp.z);
-    rolGrp.add(rFrame);
     mechGroups.roller = rolGrp;
     robotGroup.add(rolGrp);
+    // Draw default roller fallback
+    update3DModel('roller', { mechanisms: { roller: { configured: true } } });
 
     // === LAUNCHER ===
     const grabGrp = new THREE.Group();
@@ -218,6 +208,13 @@ function buildPlaceholderRobot() {
     grabGrp.add(gBase);
     mechGroups.launcher = grabGrp;
     robotGroup.add(grabGrp);
+
+    // === ARM ===
+    const armGrp = new THREE.Group();
+    mechGroups.arm = armGrp;
+    robotGroup.add(armGrp);
+    // Draw default arm fallback
+    update3DModel('arm', { mechanisms: { arm: { configured: true, dof: 2 } } });
 
     // === VISION ===
     const visGrp = new THREE.Group();
@@ -395,30 +392,168 @@ export function buildShooterPlaceholder(type, group) {
 }
 
 export function updateShooterModel(type) {
-    if (!mechGroups.shooter) return;
-    const group = mechGroups.shooter;
-    const loader = new GLTFLoader();
-    const fileName = type === 'adjustable_turret' ? 'shooter_turret.glb' : 'shooter_adjustable.glb';
-    const filePath = `assets/models/${fileName}`;
+    update3DModel('shooter', { mechanisms: { shooter: { shooterType: type } } });
+}
+
+export function update3DModel(type, state) {
+    const grp = mechGroups[type];
+    if (!grp) return;
     
-    loader.load(filePath, 
-        (gltf) => {
-            while(group.children.length > 0){ group.remove(group.children[0]); }
-            const model = gltf.scene;
-            model.scale.set(0.01, 0.01, 0.01);
-            model.position.set(POSITIONS.shooter.x, POSITIONS.shooter.y, POSITIONS.shooter.z);
-            model.traverse((child) => {
-                if (child.isMesh) {
-                    child.castShadow = true;
-                    child.receiveShadow = true;
-                }
-            });
-            group.add(model);
-        },
-        undefined,
-        (err) => {
-            console.warn(`Failed to load ${filePath}, falling back to placeholder geometry.`);
-            buildShooterPlaceholder(type, group);
+    // Clear old meshes
+    while (grp.children.length > 0) {
+        grp.remove(grp.children[0]);
+    }
+    
+    const loader = new GLTFLoader();
+    
+    if (type === 'chassis') {
+        const path = 'assets/models/Swerve_MK5i.glb';
+        loader.load(path, 
+            (gltf) => {
+                const model = gltf.scene;
+                model.scale.set(0.015, 0.015, 0.015);
+                model.position.set(POSITIONS.chassis.x, POSITIONS.chassis.y, POSITIONS.chassis.z);
+                model.traverse(c => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
+                grp.add(model);
+            },
+            undefined,
+            () => {
+                const body = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.1, 0.75), mat(COLORS.chassis));
+                body.position.y = POSITIONS.chassis.y;
+                body.castShadow = true;
+                grp.add(body);
+            }
+        );
+    } else if (type === 'elevator') {
+        const path = 'assets/models/Elevator.glb';
+        loader.load(path, 
+            (gltf) => {
+                const model = gltf.scene;
+                model.scale.set(0.012, 0.012, 0.012);
+                model.position.set(POSITIONS.elevator.x, POSITIONS.elevator.y - 0.5, POSITIONS.elevator.z);
+                model.traverse(c => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
+                grp.add(model);
+            },
+            undefined,
+            () => {
+                const ep = POSITIONS.elevator;
+                const rail = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.9, 0.08), mat(COLORS.elevator));
+                rail.position.set(ep.x - 0.08, ep.y, ep.z);
+                rail.castShadow = true;
+                grp.add(rail);
+                const rail2 = rail.clone(); rail2.position.x = ep.x + 0.08; grp.add(rail2);
+            }
+        );
+    } else if (type === 'shooter') {
+        const sh = state.mechanisms?.shooter || {};
+        const isTurret = sh.shooterType === 'adjustable_turret';
+        const file = isTurret ? 'Shooter_on_Turret.glb' : 'AdjustableShooter.glb';
+        const path = `assets/models/${file}`;
+        loader.load(path, 
+            (gltf) => {
+                const model = gltf.scene;
+                model.scale.set(0.015, 0.015, 0.015);
+                model.position.set(POSITIONS.shooter.x, POSITIONS.shooter.y, POSITIONS.shooter.z);
+                model.traverse(c => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
+                grp.add(model);
+            },
+            undefined,
+            () => {
+                buildShooterPlaceholder(sh.shooterType || 'adjustable', grp);
+            }
+        );
+    } else if (type === 'vision') {
+        const vis = state.vision || {};
+        let file = 'ArduCam_M12Lens.glb';
+        if (vis.system === 'limelight') {
+            const ver = vis.limelightVersion || 'limelight3';
+            if (ver === 'limelight3') file = 'LIMELIGHT3CAD_STEP.glb';
+            else if (ver === 'limelight3a') file = 'LIMELIGHT3ACAD_STEP.glb';
+            else if (ver === 'limelight3g') file = 'LIMELIGHT3GCAD_STEP.glb';
+            else if (ver === 'limelight4') file = 'LIMELIGHT4CAD_STEP.glb';
         }
-    );
+        const path = `assets/models/${file}`;
+        loader.load(path, 
+            (gltf) => {
+                const model = gltf.scene;
+                model.scale.set(0.02, 0.02, 0.02);
+                model.position.set(POSITIONS.vision.x, POSITIONS.vision.y, POSITIONS.vision.z);
+                model.traverse(c => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
+                grp.add(model);
+            },
+            undefined,
+            () => {
+                const vp = POSITIONS.vision;
+                const cam = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.06, 0.06), mat(COLORS.vision));
+                cam.position.set(vp.x, vp.y, vp.z);
+                cam.castShadow = true;
+                grp.add(cam);
+            }
+        );
+    } else if (type === 'roller') {
+        const rp = POSITIONS.roller;
+        const radius = 0.015;
+        const length = 0.45;
+        const gap = 0.035;
+        for (let i = 0; i < 8; i++) {
+            const pipe = new THREE.Mesh(
+                new THREE.CylinderGeometry(radius, radius, length, 12),
+                mat(COLORS.roller)
+            );
+            pipe.rotation.x = Math.PI / 2;
+            pipe.position.set(rp.x, rp.y, rp.z + (i - 3.5) * gap);
+            pipe.castShadow = true;
+            grp.add(pipe);
+        }
+    } else if (type === 'arm') {
+        const armConfig = state.mechanisms?.arm || { dof: 2 };
+        const dof = armConfig.dof || 2;
+        const ap = POSITIONS.chassis;
+        
+        let prevPivot = new THREE.Vector3(ap.x, ap.y + 0.15, ap.z);
+        let linkGroup = grp;
+
+        for (let i = 0; i < dof; i++) {
+            const length = 0.35 - i * 0.05;
+            const thickness = 0.08 - i * 0.02;
+            
+            const jointSubGrp = new THREE.Group();
+            jointSubGrp.position.copy(prevPivot);
+            linkGroup.add(jointSubGrp);
+
+            const pivotSphere = new THREE.Mesh(new THREE.SphereGeometry(thickness * 0.7, 16, 16), mat(0x222222));
+            jointSubGrp.add(pivotSphere);
+
+            const linkMesh = new THREE.Mesh(new THREE.BoxGeometry(thickness, length, thickness), mat(COLORS.accent));
+            linkMesh.position.set(0, length / 2, 0);
+            linkMesh.castShadow = true;
+            jointSubGrp.add(linkMesh);
+
+            const angle = -0.5 + i * 0.3;
+            jointSubGrp.rotation.z = angle;
+
+            prevPivot = new THREE.Vector3(0, length, 0);
+            linkGroup = jointSubGrp;
+        }
+    } else {
+        if (type === 'intake') {
+            const ip = POSITIONS.intake;
+            const intBody = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.12, 0.5), mat(COLORS.intake));
+            intBody.position.set(ip.x, ip.y, ip.z);
+            intBody.rotation.z = -0.25;
+            intBody.castShadow = true;
+            grp.add(intBody);
+        } else if (type === 'launcher') {
+            const gp = POSITIONS.launcher;
+            [-0.09, 0.09].forEach(dz => {
+                const f = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.18, 0.04), mat(COLORS.launcher));
+                f.position.set(gp.x, gp.y, gp.z + dz);
+                f.castShadow = true;
+                grp.add(f);
+            });
+            const gBase = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.04, 0.22), mat(COLORS.launcher));
+            gBase.position.set(gp.x, gp.y - 0.1, gp.z);
+            grp.add(gBase);
+        }
+    }
 }

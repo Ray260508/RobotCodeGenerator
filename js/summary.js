@@ -77,21 +77,53 @@ export function renderSummary(state) {
     // Mechanisms
     Object.entries(state.mechanisms).forEach(([type, m]) => {
         if (!m.enabled) return;
-        const motors = m.motors || [];
-        const motorLines = motors.map(mot => {
-            const mo = MOTORS[mot.type];
-            return `${mot.role}: ${mo?.name || '—'} (CAN ${mot.canId})${mot.inverted ? ' inv' : ''}`;
-        }).join('<br>');
-        html += `<div class="summary-section ${m.configured?'':'summary-missing'}">
-            <div class="summary-section-title">${type.toUpperCase()} ${!m.configured?'— Not configured':''}</div>
-            ${m.configured ? `<div class="summary-grid">
+        
+        let subHtml = '';
+        if (type === 'arm') {
+            if (m.configured) {
+                let jointsHtml = '';
+                m.joints.forEach((j, i) => {
+                    const motorLines = j.motors.map(mot => {
+                        const mo = MOTORS[mot.type];
+                        return `${mot.role}: ${mo?.name || '—'} (CAN ${mot.canId})${mot.inverted ? ' inv' : ''}`;
+                    }).join('<br>');
+                    jointsHtml += `<div style="margin-top: 8px;">
+                        <strong>Joint ${i+1}:</strong><br>
+                        - Motors: ${motorLines}<br>
+                        - Gear Ratio: ${j.gearRatio || '—'}<br>
+                        - Encoder: ${j.encoder || 'Integrated'} (ID: ${j.encoderId})<br>
+                        - PID: kP=${j.pid.kP}, kI=${j.pid.kI}, kD=${j.pid.kD}
+                    </div>`;
+                });
+                subHtml = `<div class="summary-grid" style="display:block">
+                    <div class="summary-item summary-item-wide"><span class="summary-key">DoF</span><span class="summary-val">${m.dof}</span></div>
+                    <div style="font-size:0.8rem; line-height: 1.4; color: var(--text-secondary); padding: 8px 12px; background: rgba(255,255,255,0.02); border-radius: 4px; margin-top: 8px;">
+                        ${jointsHtml}
+                    </div>
+                    <div class="summary-item"><span class="summary-key">Sim attach</span><span class="summary-val">${m.attachedTo || 'chassis'}</span></div>
+                </div>`;
+            } else {
+                subHtml = '<p style="color:var(--text-secondary);font-size:0.78rem">Enabled but not yet configured — click card to set up</p>';
+            }
+        } else {
+            const motors = m.motors || [];
+            const motorLines = motors.map(mot => {
+                const mo = MOTORS[mot.type];
+                return `${mot.role}: ${mo?.name || '—'} (CAN ${mot.canId})${mot.inverted ? ' inv' : ''}`;
+            }).join('<br>');
+            subHtml = m.configured ? `<div class="summary-grid">
                 <div class="summary-item summary-item-wide"><span class="summary-key">Motors</span><span class="summary-val">${motorLines}</span></div>
                 ${m.gearRatio?`<div class="summary-item"><span class="summary-key">Ratio</span><span class="summary-val">${m.gearRatio}</span></div>`:''}
                 ${type==='elevator'?`<div class="summary-item"><span class="summary-key">Height</span><span class="summary-val">${m.minHeight||0}–${m.maxHeight||'?'} m</span></div>`:''}
                 ${type==='shooter'&&m.maxRPM?`<div class="summary-item"><span class="summary-key">Max RPM</span><span class="summary-val">${m.maxRPM}</span></div>`:''}
                 ${m.hasSensor?`<div class="summary-item"><span class="summary-key">Sensor</span><span class="summary-val">${(m.sensorPortType||'dio').toUpperCase()} port ${m.sensorPort}</span></div>`:''}
                 ${state.attachmentRules?.[type]?`<div class="summary-item"><span class="summary-key">Sim attach</span><span class="summary-val">${m.attachedTo || 'chassis'}</span></div>`:''}
-            </div>` : '<p style="color:var(--text-secondary);font-size:0.78rem">Enabled but not yet configured — click card to set up</p>'}
+            </div>` : '<p style="color:var(--text-secondary);font-size:0.78rem">Enabled but not yet configured — click card to set up</p>';
+        }
+
+        html += `<div class="summary-section ${m.configured?'':'summary-missing'}">
+            <div class="summary-section-title">${type.toUpperCase()} ${!m.configured?'— Not configured':''}</div>
+            ${subHtml}
         </div>`;
     });
 

@@ -5,7 +5,7 @@ import appState from './state.js';
 import { renderSidebar, applySidebarConfig } from './sidebar.js';
 import { initParticles, showToast } from './renderer.js';
 import { generateProject } from './codegen.js';
-import { initViewport, zoomToMechanism, resetZoom as resetViewportZoom, updateMechConfigured, setMechVisible } from './viewport3d.js';
+import { initViewport, zoomToMechanism, resetZoom as resetViewportZoom, updateMechConfigured, setMechVisible, update3DModel } from './viewport3d.js';
 import { renderSummary } from './summary.js';
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -32,7 +32,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function bindLandingReveal() {
     const lp = document.getElementById('landing-page');
-    if (lp) lp.scrollTo(0, 0);
+    if (lp) {
+        lp.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+        setTimeout(() => {
+            lp.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+        }, 100);
+    }
 
     const easeInOutCubic = t => t < .5 ? 4 * t * t * t : (t - 1) * (2 * t - 2) * (2 * t - 2) + 1;
 
@@ -83,7 +88,10 @@ function showPage(page) {
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.getElementById(`${page}-page`)?.classList.add('active');
     appState.setPage(page);
-    if (page === 'landing') window.scrollTo({ top: 0, behavior: 'instant' });
+    if (page === 'landing') {
+        const lp = document.getElementById('landing-page');
+        if (lp) lp.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    }
 }
 
 function bindConfigurator() {
@@ -110,7 +118,7 @@ function bindConfigurator() {
         closeSidebar();
         document.querySelectorAll('.mech-toggle').forEach(t => { t.checked = false; });
         document.querySelectorAll('.mechanism-card').forEach(c => c.classList.remove('enabled', 'configured'));
-        ['elevator', 'shooter', 'intake', 'roller', 'launcher', 'vision'].forEach(m => setMechVisible(m, false));
+        ['elevator', 'shooter', 'intake', 'roller', 'launcher', 'arm', 'vision'].forEach(m => setMechVisible(m, false));
         showToast('Configuration reset', 'info');
     });
 }
@@ -164,6 +172,7 @@ function bindSidebar() {
         if (!type) return;
         applySidebarConfig(type);
         const state = appState.getState();
+        update3DModel(type, state);
         let ok = false;
         if (type === 'chassis') ok = state.chassis.configured;
         else if (type === 'vision') ok = state.vision.configured;
@@ -296,6 +305,10 @@ function updateDescriptions(state) {
     if (state.chassis.configured) set('#card-chassis .card-desc', `${state.chassis.type} · ${MNAMES[state.chassis.driveMotor] || ''}`);
     Object.entries(state.mechanisms).forEach(([t, m]) => {
         if (!m.configured) return;
+        if (t === 'arm') {
+            set(`#card-arm .card-desc`, `${m.dof} DoF Arm`);
+            return;
+        }
         const motors = m.motors || [];
         const lead = motors[0];
         const name = lead?.type ? (MNAMES[lead.type] || lead.type) : 'Motor';

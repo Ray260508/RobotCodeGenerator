@@ -10,6 +10,7 @@ export async function generateProject(state, projectName = 'FRCRobotProject') {
     const base = projectName;
     const fw = state.framework || 'advantagekit';
     zip.file(`${base}/build.gradle`, genBuildGradle(state));
+    zip.file(`${base}/README.md`, genReadme(state, projectName));
     zip.file(`${base}/settings.gradle`, `pluginManagement {\n  repositories {\n    mavenLocal()\n    gradlePluginPortal()\n    maven { url "https://frcmaven.wpi.edu/artifactory/release" }\n  }\n}\n`);
     addVendordeps(zip, base, state);
     const pkg = `${base}/src/main/java/frc/robot`;
@@ -191,60 +192,77 @@ function genConstants(s) {
         if (!m.configured) return;
         const N = type.charAt(0).toUpperCase() + type.slice(1);
         o += `    public static final class ${N}Constants {\n`;
-        // Motor CAN IDs
-        (m.motors||[]).forEach((mot, i) => {
-            const label = i === 0 ? 'MOTOR_ID' : `FOLLOWER_${i}_ID`;
-            o += `        public static final int ${label} = ${mot.canId};\n`;
-        });
-        if (m.encoderId) o += `        public static final int ENCODER_ID = ${m.encoderId};\n`;
-        if (m.gearRatio) o += `        public static final double GEAR_RATIO = ${m.gearRatio};\n`;
-        // Motor config
-        const mc = m.motorConfig || {};
-        o += `        public static final int CURRENT_LIMIT = ${mc.currentLimit || 40};\n`;
-        o += `        public static final boolean BRAKE_MODE = ${mc.brakeMode !== false};\n`;
-        if ('rampRate' in m && m.rampRate != null) o += `        public static final double RAMP_RATE_SECS = ${m.rampRate / 1000.0};\n`;
-        // Mechanism-specific
-        if (type === 'elevator') {
-            o += `        public static final double MIN_HEIGHT_M = ${m.minHeight || 0};\n`;
-            if (m.maxHeight) o += `        public static final double MAX_HEIGHT_M = ${m.maxHeight};\n`;
-            if (m.softLimitFwd) o += `        public static final double SOFT_LIMIT_FWD = ${m.softLimitFwd};\n`;
-            if (m.softLimitRev) o += `        public static final double SOFT_LIMIT_REV = ${m.softLimitRev};\n`;
-            if (m.motionMaxVel) o += `        public static final double MOTION_MAX_VEL = ${m.motionMaxVel};\n`;
-            if (m.motionMaxAccel) o += `        public static final double MOTION_MAX_ACCEL = ${m.motionMaxAccel};\n`;
-        }
-        if (type === 'shooter') {
-            o += `        public static final String SHOOTER_TYPE = "${m.shooterType || 'flywheel_only'}";\n`;
-            if (m.maxRPM) o += `        public static final double MAX_RPM = ${m.maxRPM};\n`;
-            if ((m.shooterType === 'adjustable' || m.shooterType === 'adjustable_turret') && m.pivotMotor) {
-                o += `        public static final int PIVOT_MOTOR_ID = ${m.pivotMotor.canId};\n`;
-                o += `        public static final boolean PIVOT_INVERTED = ${m.pivotMotor.inverted};\n`;
+        if (type === 'arm') {
+            o += `        public static final int DOF = ${m.dof};\n`;
+            m.joints.forEach((j, i) => {
+                o += `        // Joint ${i + 1}\n`;
+                (j.motors || []).forEach((mot, motIdx) => {
+                    const label = motIdx === 0 ? `JOINT_${i + 1}_MOTOR_ID` : `JOINT_${i + 1}_FOLLOWER_${motIdx}_ID`;
+                    o += `        public static final int ${label} = ${mot.canId};\n`;
+                    o += `        public static final boolean JOINT_${i + 1}_MOTOR_${motIdx}_INVERTED = ${mot.inverted};\n`;
+                });
+                if (j.encoder) o += `        public static final String JOINT_${i + 1}_ENCODER_TYPE = "${j.encoder}";\n`;
+                o += `        public static final int JOINT_${i + 1}_ENCODER_ID = ${j.encoderId};\n`;
+                if (j.gearRatio) o += `        public static final double JOINT_${i + 1}_GEAR_RATIO = ${j.gearRatio};\n`;
+                o += `        public static final int JOINT_${i + 1}_CURRENT_LIMIT = ${j.motorConfig.currentLimit || 40};\n`;
+                if (j.softLimitFwd) o += `        public static final double JOINT_${i + 1}_SOFT_LIMIT_FWD = ${j.softLimitFwd};\n`;
+                if (j.softLimitRev) o += `        public static final double JOINT_${i + 1}_SOFT_LIMIT_REV = ${j.softLimitRev};\n`;
+                o += `        public static final double JOINT_${i + 1}_kP = ${j.pid.kP || 0};\n`;
+                o += `        public static final double JOINT_${i + 1}_kI = ${j.pid.kI || 0};\n`;
+                o += `        public static final double JOINT_${i + 1}_kD = ${j.pid.kD || 0};\n`;
+            });
+        } else {
+            // Motor CAN IDs
+            (m.motors||[]).forEach((mot, i) => {
+                const label = i === 0 ? 'MOTOR_ID' : `FOLLOWER_${i}_ID`;
+                o += `        public static final int ${label} = ${mot.canId};\n`;
+            });
+            if (m.encoderId) o += `        public static final int ENCODER_ID = ${m.encoderId};\n`;
+            if (m.gearRatio) o += `        public static final double GEAR_RATIO = ${m.gearRatio};\n`;
+            // Motor config
+            const mc = m.motorConfig || {};
+            o += `        public static final int CURRENT_LIMIT = ${mc.currentLimit || 40};\n`;
+            o += `        public static final boolean BRAKE_MODE = ${mc.brakeMode !== false};\n`;
+            if ('rampRate' in m && m.rampRate != null) o += `        public static final double RAMP_RATE_SECS = ${m.rampRate / 1000.0};\n`;
+            // Mechanism-specific
+            if (type === 'elevator') {
+                o += `        public static final double MIN_HEIGHT_M = ${m.minHeight || 0};\n`;
+                if (m.maxHeight) o += `        public static final double MAX_HEIGHT_M = ${m.maxHeight};\n`;
+                if (m.softLimitFwd) o += `        public static final double SOFT_LIMIT_FWD = ${m.softLimitFwd};\n`;
+                if (m.softLimitRev) o += `        public static final double SOFT_LIMIT_REV = ${m.softLimitRev};\n`;
+                if (m.motionMaxVel) o += `        public static final double MOTION_MAX_VEL = ${m.motionMaxVel};\n`;
+                if (m.motionMaxAccel) o += `        public static final double MOTION_MAX_ACCEL = ${m.motionMaxAccel};\n`;
             }
-            if (m.shooterType === 'adjustable_turret' && m.turretMotor) {
-                o += `        public static final int TURRET_MOTOR_ID = ${m.turretMotor.canId};\n`;
-                o += `        public static final boolean TURRET_INVERTED = ${m.turretMotor.inverted};\n`;
+            if (type === 'shooter') {
+                o += `        public static final String SHOOTER_TYPE = "${m.shooterType || 'flywheel_only'}";\n`;
+                if (m.maxRPM) o += `        public static final double MAX_RPM = ${m.maxRPM};\n`;
+                if ((m.shooterType === 'adjustable' || m.shooterType === 'adjustable_turret') && m.pivotMotor) {
+                    o += `        public static final int PIVOT_MOTOR_ID = ${m.pivotMotor.canId};\n`;
+                    o += `        public static final boolean PIVOT_INVERTED = ${m.pivotMotor.inverted};\n`;
+                }
+                if (m.shooterType === 'adjustable_turret' && m.turretMotor) {
+                    o += `        public static final int TURRET_MOTOR_ID = ${m.turretMotor.canId};\n`;
+                    o += `        public static final boolean TURRET_INVERTED = ${m.turretMotor.inverted};\n`;
+                }
             }
-        }
-        if (type === 'launcher') {
-            o += `        public static final String LAUNCHER_TYPE = "${m.launcherType || 'simple'}";\n`;
-            if (m.launcherType === 'arm_claw' && m.clawMotor) {
-                o += `        public static final int CLAW_MOTOR_ID = ${m.clawMotor.canId};\n`;
-                o += `        public static final boolean CLAW_INVERTED = ${m.clawMotor.inverted};\n`;
+            if (type === 'launcher') {
+                o += `        public static final String LAUNCHER_TYPE = "simple";\n`;
+                if (m.softLimitFwd) o += `        public static final double SOFT_LIMIT_FWD = ${m.softLimitFwd};\n`;
+                if (m.softLimitRev) o += `        public static final double SOFT_LIMIT_REV = ${m.softLimitRev};\n`;
             }
-            if (m.softLimitFwd) o += `        public static final double SOFT_LIMIT_FWD = ${m.softLimitFwd};\n`;
-            if (m.softLimitRev) o += `        public static final double SOFT_LIMIT_REV = ${m.softLimitRev};\n`;
-        }
-        if (m.hasSensor) {
-            o += `        public static final String SENSOR_PORT_TYPE = "${m.sensorPortType}";\n`;
-            o += `        public static final int SENSOR_PORT = ${m.sensorPort};\n`;
-        }
-        if (m.pid) {
-            const pid = m.pid;
-            o += `        public static final double kP = ${pid.kP || 0};\n`;
-            o += `        public static final double kI = ${pid.kI || 0};\n`;
-            o += `        public static final double kD = ${pid.kD || 0};\n`;
-            if (pid.kS) o += `        public static final double kS = ${pid.kS};\n`;
-            if (pid.kV) o += `        public static final double kV = ${pid.kV};\n`;
-            if (pid.kA) o += `        public static final double kA = ${pid.kA};\n`;
+            if (m.hasSensor) {
+                o += `        public static final String SENSOR_PORT_TYPE = "${m.sensorPortType}";\n`;
+                o += `        public static final int SENSOR_PORT = ${m.sensorPort};\n`;
+            }
+            if (m.pid) {
+                const pid = m.pid;
+                o += `        public static final double kP = ${pid.kP || 0};\n`;
+                o += `        public static final double kI = ${pid.kI || 0};\n`;
+                o += `        public static final double kD = ${pid.kD || 0};\n`;
+                if (pid.kS) o += `        public static final double kS = ${pid.kS};\n`;
+                if (pid.kV) o += `        public static final double kV = ${pid.kV};\n`;
+                if (pid.kA) o += `        public static final double kA = ${pid.kA};\n`;
+            }
         }
         o += `    }\n\n`;
     });
@@ -301,6 +319,8 @@ function genRobotContainer(s) {
         if (t === 'intake') bindings += `        controller.rightBumper().whileTrue(Commands.runEnd(() -> ${t}.runVoltage(8), ${t}::stop, ${t}));\n`;
         if (t === 'shooter') bindings += `        controller.rightTrigger().whileTrue(Commands.runEnd(() -> ${t}.runVoltage(12), ${t}::stop, ${t}));\n`;
         if (t === 'elevator') bindings += `        controller.y().whileTrue(Commands.runEnd(() -> ${t}.runVoltage(6), ${t}::stop, ${t}));\n`;
+        if (t === 'arm') bindings += `        controller.a().whileTrue(Commands.runEnd(() -> ${t}.runJointVoltage(0, 4), ${t}::stop, ${t}));\n`;
+        if (t === 'launcher') bindings += `        controller.leftBumper().whileTrue(Commands.runEnd(() -> ${t}.runVoltage(10), ${t}::stop, ${t}));\n`;
     });
     if (s.vision.configured) {
         imp += `import frc.robot.subsystems.vision.*;\n`;
@@ -377,11 +397,89 @@ function genDriveSubsystem(zip, pkg, s, fw) {
 function genMechSubsystem(zip, pkg, type, m, state, fw) {
     const N = type.charAt(0).toUpperCase() + type.slice(1);
     const dir = `${pkg}/subsystems/${type}`;
+
+    if (type === 'arm') {
+        if (fw === 'advantagekit') {
+            // ArmIO
+            zip.file(`${dir}/ArmIO.java`, `package frc.robot.subsystems.arm;
+import org.littletonrobotics.junction.AutoLog;
+public interface ArmIO {
+    @AutoLog class ArmIOInputs {
+        public double[] positionRad = new double[3];
+        public double[] velocityRadPerSec = new double[3];
+        public double[] appliedVolts = new double[3];
+        public double[] currentAmps = new double[3];
+    }
+    default void updateInputs(ArmIOInputs inputs) {}
+    default void setJointVolts(int jointIndex, double volts) {}
+    default void stop() {}
+}
+`);
+            // ArmIOReal
+            const ioReal = genMechIOReal('arm', m, 'Arm');
+            if (ioReal) zip.file(`${dir}/ArmIOReal.java`, ioReal);
+            // ArmIOSim
+            zip.file(`${dir}/ArmIOSim.java`, genMechIOSim('arm', m, 'Arm', m.attachedTo || 'chassis'));
+            // Arm subsystem
+            zip.file(`${dir}/Arm.java`, `package frc.robot.subsystems.arm;
+import edu.wpi.first.wpilibj2.command.SubsystemBase;
+import org.littletonrobotics.junction.Logger;
+import frc.robot.Constants.ArmConstants;
+
+public class Arm extends SubsystemBase {
+    private final ArmIO io;
+    private final ArmIOInputsAutoLogged inputs = new ArmIOInputsAutoLogged();
+
+    public Arm(ArmIO io) {
+        this.io = io;
+    }
+
+    @Override public void periodic() {
+        io.updateInputs(inputs);
+        Logger.processInputs("Arm", inputs);
+    }
+
+    public void runJointVoltage(int jointIdx, double volts) { io.setJointVolts(jointIdx, volts); }
+    public double getJointPositionRad(int jointIdx) { return inputs.positionRad[jointIdx]; }
+    public void stop() { io.stop(); }
+}
+`);
+        } else {
+            // CommandBase Arm
+            let comments = '';
+            m.joints.forEach((j, i) => {
+                comments += `    // Joint ${i+1}: leader CAN ID ${j.motors[0].canId} | gear ratio ${j.gearRatio || '—'}\n`;
+            });
+            zip.file(`${dir}/Arm.java`, `package frc.robot.subsystems.arm;
+import edu.wpi.first.wpilibj2.command.SubsystemBase;
+import frc.robot.Constants.ArmConstants;
+
+public class Arm extends SubsystemBase {
+${comments}
+    public Arm() {
+        // TODO: Initialize motors
+    }
+
+    public void runJointVoltage(int jointIndex, double volts) {
+        // TODO
+    }
+
+    public double getJointPositionRad(int jointIndex) {
+        return 0.0;
+    }
+
+    public void stop() {
+        // TODO
+    }
+}
+`);
+        }
+        return;
+    }
+
     const motors = m.motors || [];
     const leaderMotor = motors[0];
-    const mi = leaderMotor ? MOTORS[leaderMotor.type] : null;
     const mc = m.motorConfig || {};
-    const pid = m.pid || {};
 
     // Motor init comments
     let motorComments = motors.map((mot, i) => {
@@ -406,11 +504,6 @@ function genMechSubsystem(zip, pkg, type, m, state, fw) {
                 extraSubsystemMethods += `    public void runTurretVoltage(double v) { io.setTurretVoltage(v); }\n    public double getTurretPosition() { return inputs.turretPositionRad; }\n`;
             }
         }
-        if (type === 'launcher' && m.launcherType === 'arm_claw') {
-            extraIOInputs += `        public double clawPositionRad = 0.0;\n        public double clawVelocityRadPerSec = 0.0;\n        public double clawAppliedVolts = 0.0;\n        public double[] clawCurrentAmps = new double[]{0.0};\n`;
-            extraIOMethods += `    default void setClawVoltage(double volts) {}\n    default void setClawPosition(double positionRad) {}\n`;
-            extraSubsystemMethods += `    public void runClawVoltage(double v) { io.setClawVoltage(v); }\n    public double getClawPosition() { return inputs.clawPositionRad; }\n`;
-        }
 
         // IO Interface
         zip.file(`${dir}/${N}IO.java`, `package frc.robot.subsystems.${type};\nimport org.littletonrobotics.junction.AutoLog;\npublic interface ${N}IO {\n    @AutoLog class ${N}IOInputs {\n        public double positionRad = 0.0;\n        public double velocityRadPerSec = 0.0;\n        public double appliedVolts = 0.0;\n        public double[] currentAmps = new double[]{0.0};\n${type==='elevator'?'        public double heightMeters = 0.0;\n':''}${m.hasSensor?'        public boolean hasPiece = false;\n':''}${extraIOInputs}    }\n    default void updateInputs(${N}IOInputs inputs) {}\n    default void setVoltage(double volts) {}\n    default void setPosition(double positionRad) {}\n    default void stop() {}\n    default void configurePID(double kP, double kI, double kD) {}\n${extraIOMethods}}\n`);
@@ -428,9 +521,6 @@ function genMechSubsystem(zip, pkg, type, m, state, fw) {
             if (m.shooterType === 'adjustable_turret') {
                 extraSubsystemMethods += `    public void runTurretVoltage(double v) { /* TODO */ }\n    public double getTurretPosition() { return 0.0; /* TODO */ }\n`;
             }
-        }
-        if (type === 'launcher' && m.launcherType === 'arm_claw') {
-            extraSubsystemMethods += `    public void runClawVoltage(double v) { /* TODO */ }\n    public double getClawPosition() { return 0.0; /* TODO */ }\n`;
         }
         // CommandBase — simple subsystem, no IO layer
         zip.file(`${dir}/${N}.java`, `package frc.robot.subsystems.${type};\nimport edu.wpi.first.wpilibj2.command.Command;\nimport edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine;\nimport edu.wpi.first.wpilibj2.command.SubsystemBase;\nimport frc.robot.Constants.${N}Constants;\nimport static edu.wpi.first.units.Units.*;\n\npublic class ${N} extends SubsystemBase {\n${motorComments}\n    // Current Limit: ${mc.currentLimit}A | Brake: ${mc.brakeMode}\n    private final SysIdRoutine sysIdRoutine;\n\n    public ${N}() {\n        // TODO: Init motor controllers\n        sysIdRoutine = new SysIdRoutine(\n            new SysIdRoutine.Config(),\n            new SysIdRoutine.Mechanism(\n                (edu.wpi.first.units.Measure<edu.wpi.first.units.Voltage> volts) -> runVoltage(volts.in(Volts)),\n                null,\n                this));\n    }\n\n    @Override public void periodic() {\n        // TODO: Update telemetry\n    }\n\n    public void runVoltage(double v) { /* TODO */ }\n    public void stop() { runVoltage(0); }\n${type==='elevator'?'    public double getHeight() { return 0; /* TODO */ }\n':''}${m.hasSensor?'    public boolean hasPiece() { return false; /* TODO */ }\n':''}${extraSubsystemMethods}    public Command sysIdQuasistatic(SysIdRoutine.Direction direction) { return sysIdRoutine.quasistatic(direction); }\n    public Command sysIdDynamic(SysIdRoutine.Direction direction) { return sysIdRoutine.dynamic(direction); }\n}\n`);
@@ -495,4 +585,56 @@ function genPathPlannerAssets(zip, base, state) {
 
 function genAutos(zip, pkg, state) {
     zip.file(`${pkg}/Autos.java`, `package frc.robot;\nimport com.pathplanner.lib.auto.AutoBuilder;\nimport com.pathplanner.lib.auto.NamedCommands;\nimport edu.wpi.first.wpilibj2.command.Command;\nimport edu.wpi.first.wpilibj.smartdashboard.SendableChooser;\nimport edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;\nimport frc.robot.subsystems.drive.Drive;\n\n/** PathPlanner auto factory — requires AutoBuilder.configure() in Drive subsystem. */\npublic final class Autos {\n    private static SendableChooser<Command> autoChooser;\n\n    private Autos() {}\n\n    public static void registerNamedCommands() {\n        // NamedCommands.registerCommand("Example", Commands.print("Named command"));\n    }\n\n    public static Command getAuto(Drive drive) {\n        registerNamedCommands();\n        if (autoChooser == null) {\n            autoChooser = AutoBuilder.buildAutoChooser();\n            SmartDashboard.putData("Auto Chooser", autoChooser);\n        }\n        Command auto = autoChooser.getSelected();\n        return auto != null ? auto : edu.wpi.first.wpilibj2.command.Commands.print("No auto selected");\n    }\n}\n`);
+}
+
+function genReadme(s, name) {
+    return `# FRC Robot Project: ${name}
+
+This deployable FRC codebase was automatically generated using the FRC Robot Code Generator.
+
+## 🛠️ Framework Overview
+- **Architecture**: ${s.framework === 'advantagekit' ? 'AdvantageKit (Telemetry-focused Multi-IO Layer)' : 'Command-Based Subsystem Template'}
+- **Chassis**: ${s.chassis.configured ? `${s.chassis.type.toUpperCase()} drive (${s.chassis.tankCanIds ? 'Tank' : 'Swerve'})` : 'None'}
+- **Vision**: ${s.vision.configured ? `${s.vision.system} supporting ${s.vision.limelightVersion || s.vision.photonPlatform}` : 'None'}
+
+---
+
+## 📈 SysId Characterization & PID/FF Tuning Tutorial
+
+During the configuration stage, you might have left PID and feedforward constants at their default/empty values. **This is completely normal!** You should adjust these values after constructing and characterizing your physical robot.
+
+### 1. What is SysId?
+SysId is the official WPILib system identification tool used to calculate optimal feedforward (kS, kV, kA) and feedback (kP, kI, kD) gains for your robot's mechanisms.
+
+### 2. How to Run SysId on this Codebase
+Every mechanism subsystem (Elevator, Shooter, Intake, or Drive) generated in this codebase comes pre-equipped with SysId routines:
+- Quasistatic test: \`sysIdQuasistatic(Direction)\`
+- Dynamic test: \`sysIdDynamic(Direction)\`
+
+To run characterization:
+1. Open your generated project using **VS Code** (with the FRC Game Tools / WPILib extension installed).
+2. Wire up buttons on your joystick/controller inside \`RobotContainer.java\` to trigger these routines during test or teleop mode, for example:
+   \`\`\`java
+   controller.a().whileTrue(elevator.sysIdQuasistatic(SysIdRoutine.Direction.kForward));
+   \`\`\`
+3. Run the robot in simulation or deploy to the RoboRIO.
+4. Open the **SysId desktop application** from WPILib.
+5. Record telemetry data over NetworkTables, then analyze the logs to obtain the feedforward and feedback constants.
+
+### 3. Where to Update PID/FF Values in Code
+Once you have obtained the values, open the following file:
+📍 **\`src/main/java/frc/robot/Constants.java\`**
+
+Locate the corresponding Constants class for your mechanism:
+- For Drive: \`DriveConstants\`
+- For Elevator: \`ElevatorConstants\`
+- For Shooter: \`ShooterConstants\`
+- For Arm: \`ArmConstants\`
+- For Launcher: \`LauncherConstants\`
+
+Update the constants like \`kP\`, \`kI\`, \`kD\`, \`kS\`, \`kV\`, and \`kA\` directly inside those classes.
+
+For complete step-by-step guides, refer to the official **WPILib SysId documentation**:
+🔗 https://docs.wpilib.org/en/stable/docs/software/advanced-controls/system-identification/index.html
+`;
 }

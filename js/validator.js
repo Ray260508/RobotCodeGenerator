@@ -47,6 +47,16 @@ export function validateConfig(state) {
     Object.entries(state.mechanisms).forEach(([type, m]) => {
         if (!m.enabled || !m.configured) return;
         const name = type.charAt(0).toUpperCase() + type.slice(1);
+        if (type === 'arm') {
+            m.joints.forEach((j, idx) => {
+                j.motors.forEach((mot, i) => {
+                    addCanId(`Arm Joint ${idx+1} Motor ${i}`, mot.canId);
+                });
+                if (j.encoderId) addCanId(`Arm Joint ${idx+1} Encoder`, j.encoderId);
+                if (!j.motors?.length || !j.motors[0]?.type) warnings.push({ section: `Arm Joint ${idx+1}`, msg: 'No motor selected' });
+            });
+            return;
+        }
         // Multi-motor CAN IDs
         (m.motors || []).forEach((mot, i) => {
             addCanId(`${name} Motor ${i}`, mot.canId);

@@ -7,6 +7,84 @@ import {
 } from './motors.js';
 
 export function genMechIOReal(type, m, N) {
+    if (type === 'arm') {
+        let imports = 'import frc.robot.Constants.ArmConstants;\n';
+        let fields = '';
+        let initBlocks = '        // Initialize each joint\n';
+        let updates = '';
+        let voltMethods = '';
+
+        m.joints.forEach((j, i) => {
+            const lead = j.motors[0];
+            const hasFollower = j.motors.length > 1;
+
+            if (lead && lead.type) {
+                if (isCTRE(lead.type)) {
+                    imports += 'import com.ctre.phoenix6.hardware.TalonFX;\nimport com.ctre.phoenix6.controls.VoltageOut;\n';
+                    fields += `    private final TalonFX joint${i}Motor = new TalonFX(ArmConstants.JOINT_${i+1}_MOTOR_ID);\n`;
+                    initBlocks += `        var joint${i}Cfg = new com.ctre.phoenix6.configs.TalonFXConfiguration();\n`;
+                    initBlocks += `        joint${i}Cfg.MotorOutput.Inverted = ArmConstants.JOINT_${i+1}_MOTOR_0_INVERTED ? com.ctre.phoenix6.signals.InvertedValue.Clockwise_Positive : com.ctre.phoenix6.signals.InvertedValue.CounterClockwise_Positive;\n`;
+                    initBlocks += `        joint${i}Motor.getConfigurator().apply(joint${i}Cfg);\n`;
+                    if (hasFollower) {
+                        fields += `    private final TalonFX joint${i}Follower = new TalonFX(ArmConstants.JOINT_${i+1}_FOLLOWER_1_ID);\n`;
+                        initBlocks += `        joint${i}Follower.setControl(new com.ctre.phoenix6.controls.Follower(joint${i}Motor.getDeviceID()));\n`;
+                    }
+                    updates += `        inputs.positionRad[${i}] = joint${i}Motor.getPosition().getValueAsDouble() * 2 * Math.PI;\n`;
+                    updates += `        inputs.velocityRadPerSec[${i}] = joint${i}Motor.getVelocity().getValueAsDouble() * 2 * Math.PI;\n`;
+                    updates += `        inputs.appliedVolts[${i}] = joint${i}Motor.getMotorVoltage().getValueAsDouble();\n`;
+                    updates += `        inputs.currentAmps[${i}] = joint${i}Motor.getStatorCurrent().getValueAsDouble();\n`;
+                } else if (isREV(lead.type)) {
+                    imports += 'import com.revrobotics.spark.SparkMax;\nimport com.revrobotics.spark.SparkLowLevel.MotorType;\n';
+                    fields += `    private final SparkMax joint${i}Motor = new SparkMax(ArmConstants.JOINT_${i+1}_MOTOR_ID, MotorType.kBrushless);\n`;
+                    initBlocks += `        var joint${i}Cfg = new com.revrobotics.spark.config.SparkMaxConfig();\n`;
+                    initBlocks += `        joint${i}Cfg.inverted(ArmConstants.JOINT_${i+1}_MOTOR_0_INVERTED);\n`;
+                    initBlocks += `        joint${i}Motor.configure(joint${i}Cfg, com.revrobotics.spark.SparkBase.ResetMode.kResetSafeParameters, com.revrobotics.spark.SparkBase.PersistMode.kPersistParameters);\n`;
+                    if (hasFollower) {
+                        fields += `    private final SparkMax joint${i}Follower = new SparkMax(ArmConstants.JOINT_${i+1}_FOLLOWER_1_ID, MotorType.kBrushless);\n`;
+                        initBlocks += `        var joint${i}FollowerCfg = new com.revrobotics.spark.config.SparkMaxConfig();\n`;
+                        initBlocks += `        joint${i}FollowerCfg.follow(joint${i}Motor);\n`;
+                        initBlocks += `        joint${i}Follower.configure(joint${i}FollowerCfg, com.revrobotics.spark.SparkBase.ResetMode.kResetSafeParameters, com.revrobotics.spark.SparkBase.PersistMode.kPersistParameters);\n`;
+                    }
+                    updates += `        inputs.positionRad[${i}] = joint${i}Motor.getEncoder().getPosition();\n`;
+                    updates += `        inputs.velocityRadPerSec[${i}] = joint${i}Motor.getEncoder().getVelocity();\n`;
+                    updates += `        inputs.appliedVolts[${i}] = joint${i}Motor.getAppliedOutput() * joint${i}Motor.getBusVoltage();\n`;
+                    updates += `        inputs.currentAmps[${i}] = joint${i}Motor.getOutputCurrent();\n`;
+                }
+                voltMethods += `
+    @Override
+    public void setJointVolts(int jointIndex, double volts) {
+        if (jointIndex == ${i}) {
+            ${isCTRE(lead.type) ? `joint${i}Motor.setControl(new VoltageOut(volts));` : `joint${i}Motor.setVoltage(volts);`}
+        }
+    }\n`;
+            }
+        });
+
+        const uniqueImports = [...new Set(imports.split('\n').filter(Boolean))].join('\n');
+
+        return `package frc.robot.subsystems.arm;
+${uniqueImports}
+
+public class ArmIOReal implements ArmIO {
+${fields}
+    public ArmIOReal() {
+${initBlocks}    }
+
+    @Override
+    public void updateInputs(ArmIOInputs inputs) {
+${updates}    }
+
+${voltMethods}
+    @Override
+    public void stop() {
+        for (int i = 0; i < ArmConstants.DOF; i++) {
+            setJointVolts(i, 0.0);
+        }
+    }
+}
+`;
+    }
+
     const motors = m.motors || [];
     const lead = motors[0];
     if (!lead?.type) return null;
@@ -41,7 +119,7 @@ export function genMechIOReal(type, m, N) {
 
     const setVoltageBody = isCTRE(lead.type)
         ? '        leader.setControl(voltageReq.withOutput(volts));'
-        : genSetVoltage(motors);
+        : '        leader.setVoltage(volts);';
 
     let extraUpdate = '';
     let extraMethods = '';
@@ -129,6 +207,61 @@ ${setVoltageBody}    }${extraMethods}
 }
 
 export function genMechIOSim(type, m, N, attachedTo) {
+    if (type === 'arm') {
+        let fields = '';
+        let simUpdates = '';
+        let setVolts = '';
+
+        m.joints.forEach((j, i) => {
+            fields += `    private final DCMotorSim joint${i}Sim = new DCMotorSim(
+        LinearSystemId.createDCMotorSystem(DCMotor.getNEO(1), 0.002, 10.0),
+        DCMotor.getNEO(1), 0.002, 0.01);
+    private final EncoderSim joint${i}EncoderSim = new EncoderSim(joint${i}Sim);
+    private double joint${i}AppliedVolts = 0.0;\n`;
+
+            simUpdates += `
+        joint${i}Sim.setInputVoltage(RoboRioSim.getVInVoltage() * joint${i}AppliedVolts / 12.0);
+        joint${i}Sim.update(0.02);
+        inputs.positionRad[${i}] = joint${i}EncoderSim.getDistance();
+        inputs.velocityRadPerSec[${i}] = joint${i}EncoderSim.getRate();
+        inputs.appliedVolts[${i}] = joint${i}AppliedVolts;
+        inputs.currentAmps[${i}] = joint${i}Sim.getCurrentDrawAmps();\n`;
+
+            setVolts += `        if (jointIndex == ${i}) joint${i}AppliedVolts = volts;\n`;
+        });
+
+        return `package frc.robot.subsystems.arm;
+
+import edu.wpi.first.math.system.plant.DCMotor;
+import edu.wpi.first.math.system.plant.LinearSystemId;
+import edu.wpi.first.wpilibj.simulation.DCMotorSim;
+import edu.wpi.first.wpilibj.simulation.EncoderSim;
+import edu.wpi.first.wpilibj.simulation.RoboRioSim;
+import frc.robot.Constants.ArmConstants;
+
+public class ArmIOSim implements ArmIO {
+    /** Simulation parent: ${attachedTo || 'chassis'} */
+${fields}
+    public ArmIOSim() {}
+
+    @Override
+    public void updateInputs(ArmIOInputs inputs) {
+${simUpdates}    }
+
+    @Override
+    public void setJointVolts(int jointIndex, double volts) {
+${setVolts}    }
+
+    @Override
+    public void stop() {
+        for (int i = 0; i < ArmConstants.DOF; i++) {
+            setJointVolts(i, 0.0);
+        }
+    }
+}
+`;
+    }
+
     let extraFields = '';
     let extraUpdate = '';
     let extraMethods = '';
@@ -172,27 +305,6 @@ export function genMechIOSim(type, m, N, attachedTo) {
         extraMethods += `
     @Override
     public void setTurretVoltage(double volts) { turretAppliedVolts = volts; }
-`;
-    }
-
-    if (type === 'launcher' && m.launcherType === 'arm_claw') {
-        extraFields += `
-    private final DCMotorSim clawSim = new DCMotorSim(
-        LinearSystemId.createDCMotorSystem(DCMotor.getNEO(1), 0.002, 10.0),
-        DCMotor.getNEO(1), 0.002, 0.01);
-    private final EncoderSim clawEncoderSim = new EncoderSim(clawSim);
-    private double clawAppliedVolts = 0.0;
-`;
-        extraUpdate += `
-        clawSim.setInputVoltage(RoboRioSim.getVInVoltage() * clawAppliedVolts / 12.0);
-        clawSim.update(0.02);
-        inputs.clawPositionRad = clawEncoderSim.getDistance();
-        inputs.clawVelocityRadPerSec = clawEncoderSim.getRate();
-        inputs.clawAppliedVolts = clawAppliedVolts;
-`;
-        extraMethods += `
-    @Override
-    public void setClawVoltage(double volts) { clawAppliedVolts = volts; }
 `;
     }
 
