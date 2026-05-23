@@ -252,4 +252,24 @@
 .preview-code::-webkit-scrollbar-thumb { background: var(--text-secondary); border-radius: 3px; }
 .preview-code::-webkit-scrollbar-track { background: transparent; }
 
+.summary-code-preview {
+    margin-top: var(--space-md);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: var(--space-sm);
+}
+
+.summary-code-preview summary {
+    cursor: pointer;
+    font-family: var(--font-display);
+    font-size: 0.7rem;
+    letter-spacing: 1.5px;
+    color: var(--text-secondary);
+}
+
+.summary-collapsible-preview {
+    margin-top: var(--space-sm);
+}
+
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }

@@ -1,0 +1,86 @@
+#sysid-page {
+    overflow-y: auto;
+}
+
+.sysid-content {
+    max-width: 900px;
+    margin: 40px auto;
+    padding: 20px;
+    color: var(--text-primary);
+    line-height: 1.8;
+    font-family: var(--font-body);
+}
+
+.sysid-title {
+    color: var(--accent-red);
+    margin-bottom: 20px;
+    font-family: var(--font-display);
+    font-size: 2.5rem;
+}
+
+.sysid-intro {
+    font-size: 1.1rem;
+    color: var(--text-secondary);
+}
+
+.sysid-step {
+    background: var(--bg-surface);
+    padding: 24px;
+    border-radius: 8px;
+    border: 1px solid var(--border-medium);
+    margin-top: 24px;
+}
+
+.sysid-step:first-of-type {
+    margin-top: 30px;
+}
+
+.sysid-step-title {
+    color: var(--accent-gold);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.sysid-step-badge {
+    background: var(--accent-gold-dim);
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.9rem;
+}
+
+.sysid-code-block {
+    background: #111;
+    padding: 16px;
+    border-radius: 6px;
+    overflow-x: auto;
+    color: #ddd;
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    margin-top: 12px;
+}
+
+.sysid-list {
+    margin-left: 20px;
+    margin-top: 12px;
+}
+
+.sysid-list li {
+    margin-bottom: 8px;
+}
+
+.sysid-list-numbered {
+    margin-left: 24px;
+    margin-top: 12px;
+}
+
+.sysid-list-numbered li {
+    margin-bottom: 8px;
+}
+
+.sysid-loading,
+.sysid-error {
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+}

@@ -9,13 +9,14 @@ import { GEN_MODE } from './manifest.js';
 import { initViewport, zoomToMechanism, resetZoom as resetViewportZoom, updateMechConfigured, setMechVisible, update3DModel } from './viewport3d.js';
 import { renderSummary } from './summary.js';
 
+const CONFIG_STORAGE_KEY = 'robotConfig';
+
 document.addEventListener('DOMContentLoaded', () => {
     const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) || window.innerWidth < 768;
     appState.state.isMobile = isMobile;
-    if (isMobile) {
-        document.body.classList.add('is-mobile');
-        document.getElementById('mobile-banner').style.display = 'block';
-    }
+    if (isMobile) document.body.classList.add('is-mobile');
+
+    restoreSavedState();
     initParticles();
     bindNavigation();
     bindLandingReveal();
@@ -23,8 +24,10 @@ document.addEventListener('DOMContentLoaded', () => {
     bindToggles();
     bindSidebar();
     bindGeneration();
+    applyStateToUI(appState.getState());
 
     appState.subscribe((state) => {
+        persistState(state);
         updateProgressBar();
         updateCardStates(state);
         syncViewport(state);
@@ -72,6 +75,7 @@ function bindNavigation() {
     document.getElementById('nav-sysid')?.addEventListener('click', (e) => {
         e.preventDefault();
         showPage('sysid');
+        loadSysIdPage();
     });
     document.getElementById('sysid-back')?.addEventListener('click', () => showPage('landing'));
 
@@ -195,7 +199,6 @@ function bindGeneration() {
 
     document.getElementById('btn-generate')?.addEventListener('click', () => {
         const state = appState.getState();
-        if (state.isMobile) { showToast('Desktop required', 'error'); return; }
         if (!state.chassis.configured) { showToast('Configure chassis first', 'error'); return; }
         renderSummary(state);
         summaryOverlay.style.display = 'flex';
@@ -270,6 +273,80 @@ function bindGeneration() {
             setTimeout(() => genOverlay.style.display = 'none', 3000);
         }
     });
+}
+
+function applyStateToUI(state) {
+    const projectInput = document.getElementById('project-name-input');
+    if (projectInput && state.projectName) projectInput.value = state.projectName;
+
+    document.querySelectorAll('.mech-toggle').forEach(toggle => {
+        const mech = toggle.dataset.mech;
+        let enabled = false;
+        if (mech === 'vision') enabled = state.vision.enabled;
+        else if (mech === 'statemachine') enabled = state.statemachine.enabled;
+        else enabled = !!state.mechanisms[mech]?.enabled;
+        toggle.checked = enabled;
+        const card = toggle.closest('.mechanism-card');
+        if (!card) return;
+        card.classList.toggle('enabled', enabled);
+        if (!enabled) card.querySelector('.card-desc').textContent = 'Disabled';
+        setMechVisible(mech, enabled);
+    });
+
+    updateDescriptions(state);
+    updateProgressBar();
+    updateCardStates(state);
+}
+
+function persistState(state) {
+    const projectName = document.getElementById('project-name-input')?.value || 'FRC2026_Robot';
+    const payload = { ...state, projectName };
+    try {
+        localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(payload));
+        const indicator = document.getElementById('config-saved-indicator');
+        if (indicator) {
+            indicator.classList.add('show');
+            clearTimeout(indicator._hideTimer);
+            indicator._hideTimer = setTimeout(() => indicator.classList.remove('show'), 1200);
+        }
+    } catch (err) {
+        // Ignore localStorage quota and privacy mode errors.
+    }
+}
+
+function restoreSavedState() {
+    try {
+        const raw = localStorage.getItem(CONFIG_STORAGE_KEY);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        appState.loadState(parsed);
+    } catch (err) {
+        // Ignore malformed storage entries and continue with defaults.
+    }
+}
+
+async function loadSysIdPage() {
+    const container = document.getElementById('sysid-content-container');
+    if (!container || container.dataset.loaded === 'true') return;
+    container.innerHTML = '<p class="sysid-loading">Loading SysId guide...</p>';
+
+    const relativePath = `${import.meta.env.BASE_URL}pages/sysid.html`;
+    const fallbackPath = './pages/sysid.html';
+    const candidates = [relativePath, fallbackPath];
+
+    for (const path of candidates) {
+        try {
+            const res = await fetch(path, { cache: 'no-cache' });
+            if (!res.ok) continue;
+            container.innerHTML = await res.text();
+            container.dataset.loaded = 'true';
+            return;
+        } catch (err) {
+            // Try next candidate path.
+        }
+    }
+
+    container.innerHTML = '<p class="sysid-error">Unable to load SysId guide. Please refresh and try again.</p>';
 }
 
 function updateProgressBar() {

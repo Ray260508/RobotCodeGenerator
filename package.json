@@ -1,6 +1,6 @@
 {
   "name": "frc-robot-code-generator",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "FRC Robot Code Generator with AdvantageKit architecture",
   "type": "module",
   "scripts": {
@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "jszip": "^3.10.1",
     "three": "^0.170.0"
   },
   "devDependencies": {

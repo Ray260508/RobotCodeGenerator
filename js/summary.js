@@ -172,7 +172,7 @@ export function renderSummary(state) {
             You can use the SysId tool to characterize your robot and find the optimal values.<br><br>
             <strong>How to update later:</strong> You can directly modify the constants in <code>Constants.java</code> (e.g. <code>ShooterConstants.kP</code>).
             <br><br>
-            <a href="javascript:void(0)" onclick="document.getElementById('sysid-btn').click()" style="color: var(--accent-cyan); text-decoration: underline;">Click here to view the SysId Guide</a>.
+            <a href="javascript:void(0)" onclick="document.getElementById('nav-sysid').click()" style="color: var(--accent-cyan); text-decoration: underline;">Click here to view the SysId Guide</a>.
         </p>
     </div>`;
 
@@ -203,6 +203,11 @@ export function renderSummary(state) {
             </label>
         </div>
     </div>`;
+
+    html += `<details class="summary-code-preview">
+        <summary>Generated Code Preview (Constants.java)</summary>
+        <pre class="preview-code summary-collapsible-preview"><code id="summary-collapsible-preview-content"></code></pre>
+    </details>`;
 
     html += `</div>`; // close review tab
 
@@ -241,6 +246,8 @@ export function renderSummary(state) {
     // Show Constants by default
     const codeEl = body.querySelector('#preview-code-content');
     if (codeEl) codeEl.textContent = generatePreview(state, 'Constants');
+    const collapsibleCodeEl = body.querySelector('#summary-collapsible-preview-content');
+    if (collapsibleCodeEl) collapsibleCodeEl.textContent = generatePreview(state, 'Constants');
 
     // Disable confirm if errors
     const confirmBtn = document.getElementById('summary-confirm');

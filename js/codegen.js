@@ -2,6 +2,7 @@
  * Code Generator — Phase 6: Framework selection, multi-motor, PathPlanner, Phoenix 6
  */
 import { MOTORS, ENCODERS, GYROS } from './constants.js';
+import JSZip from 'jszip';
 import { genTankIOReal, genDriveIOSim, genSwerveDriveIOReal, genSwerveDriveIOSim } from './templates/drive.js';
 import { genMechIOReal, genMechIOSim } from './templates/mech.js';
 import { genSysIdBindings, genSysIdChooserField, genSysIdImports } from './templates/sysid.js';

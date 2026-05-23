@@ -48,6 +48,37 @@
     letter-spacing: 3px;
 }
 
+.topbar-title-wrap {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.project-name-input {
+    background: rgba(255,255,255,0.1);
+    border: 1px solid var(--border-medium);
+    color: var(--text-primary);
+    padding: 4px 12px;
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    width: 200px;
+}
+
+.config-saved-indicator {
+    opacity: 0;
+    transform: translateY(-2px);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: #44cc66;
+}
+
+.config-saved-indicator.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+
 .topbar-status {
     font-family: var(--font-mono);
     font-size: 0.75rem;
@@ -413,7 +444,7 @@
     background: rgba(0, 0, 0, 0.7);
     backdrop-filter: blur(8px);
     z-index: var(--z-modal);
-    display: flex;
+    display: none;
     align-items: center;
     justify-content: center;
     animation: fadeIn 0.3s var(--ease-out);

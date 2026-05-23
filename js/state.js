@@ -103,6 +103,23 @@ class StateManager {
 
     notify(path) { this.listeners.forEach(fn => fn(this.state, path)); }
 
+    loadState(savedState) {
+        if (!savedState || typeof savedState !== 'object') return false;
+        this.state = {
+            ...JSON.parse(JSON.stringify(DEFAULT_STATE)),
+            ...savedState,
+            chassis: { ...JSON.parse(JSON.stringify(DEFAULT_STATE.chassis)), ...(savedState.chassis || {}) },
+            mechanisms: { ...JSON.parse(JSON.stringify(DEFAULT_STATE.mechanisms)), ...(savedState.mechanisms || {}) },
+            vision: { ...JSON.parse(JSON.stringify(DEFAULT_STATE.vision)), ...(savedState.vision || {}) },
+            statemachine: { ...JSON.parse(JSON.stringify(DEFAULT_STATE.statemachine)), ...(savedState.statemachine || {}) },
+        };
+        this.state.currentPage = 'landing';
+        this.state.selectedMechanism = null;
+        this.state.sidebarOpen = false;
+        this.notify('load');
+        return true;
+    }
+
     setPage(page) { this.state.currentPage = page; this.notify('currentPage'); }
     setFramework(fw) { this.state.framework = fw; this.notify('framework'); }
     setStateMachineIntegration(enabled) {
