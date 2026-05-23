@@ -4,6 +4,7 @@
 import appState from './state.js';
 import { MOTORS, ENCODERS, GYROS, CHASSIS_TYPES, SWERVE_PRESETS, LIMELIGHT_VERSIONS, PHOTON_PLATFORMS, SENSOR_PORT_TYPES, DEFAULT_CAN_IDS } from './constants.js';
 import { updateShooterModel } from './viewport3d.js';
+import { getAllMechanisms } from './registry.js';
 
 function opts(obj, sel) {
     return `<option value="">— Select —</option>` + Object.entries(obj).map(([k,v]) => `<option value="${k}" ${k===sel?'selected':''}>${v.name}</option>`).join('');
@@ -39,17 +40,24 @@ export function renderSidebar(type) {
     const s = appState.getState();
     const title = document.getElementById('sidebar-title');
     const content = document.getElementById('sidebar-content');
-    switch(type) {
-        case 'chassis': return renderChassis(s, title, content);
-        case 'elevator': return renderElevator(s, title, content);
-        case 'shooter': return renderShooter(s, title, content);
-        case 'intake': return renderIntake(s, title, content);
-        case 'roller': return renderRoller(s, title, content);
-        case 'launcher': return renderLauncher(s, title, content);
-        case 'arm': return renderArm(s, title, content);
-        case 'vision': return renderVision(s, title, content);
-        case 'statemachine': return renderStateMachine(s, title, content);
-    }
+    // Built-in non-mechanism types
+    if (type === 'chassis') return renderChassis(s, title, content);
+    if (type === 'vision') return renderVision(s, title, content);
+    if (type === 'statemachine') return renderStateMachine(s, title, content);
+    // Registry-driven mechanism render
+    const mechRenderers = {
+        elevator: renderElevator,
+        shooter: renderShooter,
+        intake: renderIntake,
+        roller: renderRoller,
+        launcher: renderLauncher,
+        arm: renderArm,
+    };
+    const renderer = mechRenderers[type];
+    if (renderer) return renderer(s, title, content);
+    // Unknown type (custom mechanism) — use generic renderer
+    const mech = getAllMechanisms().find(m => m.id === type);
+    if (mech) return renderGenericMech(s, title, content, type, mech.name);
 }
 
 // ===== CHASSIS =====
@@ -207,8 +215,22 @@ function renderMech(s, title, content, type, name, extra='', extraTop='') {
     let gearHtml = `<div class="config-divider"></div>
         <div class="config-row">${numInput(`cfg-${type}-ratio`,'Gear Ratio',m.gearRatio,'1.0','0.01')}</div>`;
 
+    // Physics section (collapsed by default, for sim fidelity)
+    const phys = m.physics || {};
+    const physHtml = `<div class="config-divider"></div>
+        <details class="config-details">
+            <summary class="config-section-title" style="cursor:pointer;user-select:none;">
+                ⚙ PHYSICS (Simulation) <span style="font-size:0.7rem;color:var(--text-secondary);font-weight:400;">— optional, improves sim accuracy</span>
+            </summary>
+            <div class="config-row" style="margin-top:8px;">
+                ${numInput(`cfg-${type}-mass`, 'Mass (kg)', phys.massKg, 'e.g. 5.0', '0.1')}
+                ${numInput(`cfg-${type}-moi`, 'MOI (kg·m²)', phys.moiKgM2, 'e.g. 0.1', '0.001')}
+            </div>
+            <p class="config-hint" style="margin-top:4px;">Used in simulation physics model. Leave blank to use defaults.</p>
+        </details>`;
+
     const simHtml = s.attachmentRules[type] ? simulationAttachSelect(type, m, s.attachmentRules) : '';
-    content.innerHTML = extraTop + motorsHtml + configHtml + simHtml + gearHtml + extra;
+    content.innerHTML = extraTop + motorsHtml + configHtml + simHtml + gearHtml + physHtml + extra;
 
     // Add motor button
     document.getElementById(`btn-add-motor-${type}`)?.addEventListener('click', () => {
@@ -225,6 +247,11 @@ function renderMech(s, title, content, type, name, extra='', extraTop='') {
             renderSidebar(type);
         });
     });
+}
+
+// Generic renderer for custom/unknown mechanism types
+function renderGenericMech(s, title, content, type, displayName) {
+    renderMech(s, title, content, type, displayName.toUpperCase());
 }
 
 function renderElevator(s, title, content) {
@@ -620,124 +647,8 @@ export function applySidebarConfig(type) {
             };
         }
         appState.updateChassis(c);
-    } else if (['elevator','shooter','intake','roller','launcher'].includes(type)) {
-        // Read multi-motor array
-        const m = s.mechanisms[type];
-        m.motors.forEach((mot, i) => {
-            appState.updateMotor(type, i, {
-                type: document.getElementById(`cfg-${type}-motor-${i}`)?.value || null,
-                canId: parseInt(document.getElementById(`cfg-${type}-canid-${i}`)?.value) || mot.canId,
-                inverted: document.getElementById(`cfg-${type}-inv-${i}`)?.checked || false,
-                role: document.getElementById(`cfg-${type}-role-${i}`)?.value || mot.role,
-            });
-        });
-        const brakeVal = document.querySelector(`input[name="cfg-${type}-brakemode"]:checked`)?.value;
-        const mc = {
-            currentLimit: parseInt(document.getElementById(`cfg-${type}-curlimit`)?.value) || 40,
-            brakeMode: brakeVal !== 'coast',
-        };
-        // Read PID if present
-        const pid = m.pid ? {
-            kP: parseFloat(document.getElementById(`cfg-${type}-kp`)?.value) || 0,
-            kI: parseFloat(document.getElementById(`cfg-${type}-ki`)?.value) || 0,
-            kD: parseFloat(document.getElementById(`cfg-${type}-kd`)?.value) || 0,
-            kS: parseFloat(document.getElementById(`cfg-${type}-ks`)?.value) || 0,
-            kV: parseFloat(document.getElementById(`cfg-${type}-kv`)?.value) || 0,
-            kA: parseFloat(document.getElementById(`cfg-${type}-ka`)?.value) || 0,
-        } : undefined;
-        const attachedTo = document.getElementById(`cfg-${type}-attached`)?.value;
-        const u = {
-            gearRatio: parseFloat(document.getElementById(`cfg-${type}-ratio`)?.value) || null,
-            motorConfig: mc,
-            attachedTo: attachedTo || m.attachedTo,
-        };
-        if (pid) u.pid = pid;
-        if ('rampRate' in m) {
-            u.rampRate = parseFloat(document.getElementById(`cfg-${type}-ramp`)?.value) || 0;
-        }
-        if (type === 'elevator') {
-            u.encoder = document.getElementById('cfg-elevator-encoder')?.value || null;
-            u.encoderId = parseInt(document.getElementById('cfg-elevator-enc-id')?.value) || 53;
-            u.minHeight = parseFloat(document.getElementById('cfg-elevator-min')?.value) || 0;
-            u.maxHeight = parseFloat(document.getElementById('cfg-elevator-max')?.value) || null;
-            u.softLimitFwd = parseFloat(document.getElementById('cfg-elevator-softfwd')?.value) || null;
-            u.softLimitRev = parseFloat(document.getElementById('cfg-elevator-softrev')?.value) || null;
-            u.motionMaxVel = parseFloat(document.getElementById('cfg-elevator-mmvel')?.value) || null;
-            u.motionMaxAccel = parseFloat(document.getElementById('cfg-elevator-mmacc')?.value) || null;
-        }
-        if (type === 'shooter') {
-            u.maxRPM = parseInt(document.getElementById('cfg-shooter-rpm')?.value) || null;
-            if (m.shooterType === 'adjustable' || m.shooterType === 'adjustable_turret') {
-                u.pivotMotor = {
-                    type: document.getElementById('cfg-shooter-pivot-motor')?.value || null,
-                    canId: parseInt(document.getElementById('cfg-shooter-pivot-canid')?.value) || 24,
-                    inverted: document.getElementById('cfg-shooter-pivot-inv')?.checked || false,
-                };
-            }
-            if (m.shooterType === 'adjustable_turret') {
-                u.turretMotor = {
-                    type: document.getElementById('cfg-shooter-turret-motor')?.value || null,
-                    canId: parseInt(document.getElementById('cfg-shooter-turret-canid')?.value) || 25,
-                    inverted: document.getElementById('cfg-shooter-turret-inv')?.checked || false,
-                };
-            }
-        }
-        if (type === 'intake') {
-            u.hasSensor = document.getElementById('cfg-intake-sensor')?.checked || false;
-            u.sensorPortType = document.getElementById('cfg-intake-sensor-type')?.value || 'dio';
-            u.sensorPort = parseInt(document.getElementById('cfg-intake-sensor-port')?.value) || 0;
-        }
-        if (type === 'launcher') {
-            u.softLimitFwd = parseFloat(document.getElementById('cfg-launcher-softfwd')?.value) || null;
-            u.softLimitRev = parseFloat(document.getElementById('cfg-launcher-softrev')?.value) || null;
-            u.hasSensor = document.getElementById('cfg-launcher-sensor')?.checked || false;
-            u.sensorPortType = document.getElementById('cfg-launcher-sensor-type')?.value || 'dio';
-            u.sensorPort = parseInt(document.getElementById('cfg-launcher-sensor-port')?.value) || 1;
-        }
-        if (type === 'arm') {
-            const dof = parseInt(document.getElementById('cfg-arm-dof')?.value) || m.dof;
-            const joints = [];
-            for (let i = 0; i < dof; i++) {
-                const hasFollower = document.getElementById(`cfg-arm-joint-${i}-hasfollower`)?.checked || false;
-                const motors = [
-                    {
-                        type: document.getElementById(`cfg-arm-joint-${i}-leader-motor`)?.value || null,
-                        canId: parseInt(document.getElementById(`cfg-arm-joint-${i}-leader-canid`)?.value) || (30 + i * 2),
-                        inverted: document.getElementById(`cfg-arm-joint-${i}-leader-inv`)?.checked || false,
-                        role: 'leader'
-                    }
-                ];
-                if (hasFollower) {
-                    motors.push({
-                        type: document.getElementById(`cfg-arm-joint-${i}-follower-motor`)?.value || null,
-                        canId: parseInt(document.getElementById(`cfg-arm-joint-${i}-follower-canid`)?.value) || (31 + i * 2),
-                        inverted: document.getElementById(`cfg-arm-joint-${i}-follower-inv`)?.checked || false,
-                        role: 'follower'
-                    });
-                }
-                joints.push({
-                    motors,
-                    gearRatio: parseFloat(document.getElementById(`cfg-arm-joint-${i}-ratio`)?.value) || null,
-                    encoder: document.getElementById(`cfg-arm-joint-${i}-encoder`)?.value || null,
-                    encoderId: parseInt(document.getElementById(`cfg-arm-joint-${i}-encoder-id`)?.value) || (31 + i * 2),
-                    motorConfig: {
-                        currentLimit: parseInt(document.getElementById(`cfg-arm-joint-${i}-curlimit`)?.value) || 40,
-                        brakeMode: true
-                    },
-                    softLimitFwd: parseFloat(document.getElementById(`cfg-arm-joint-${i}-softfwd`)?.value) || null,
-                    softLimitRev: parseFloat(document.getElementById(`cfg-arm-joint-${i}-softrev`)?.value) || null,
-                    pid: {
-                        kP: parseFloat(document.getElementById(`cfg-arm-joint-${i}-kp`)?.value) || 0,
-                        kI: parseFloat(document.getElementById(`cfg-arm-joint-${i}-ki`)?.value) || 0,
-                        kD: parseFloat(document.getElementById(`cfg-arm-joint-${i}-kd`)?.value) || 0,
-                        kS: 0, kV: 0, kA: 0
-                    }
-                });
-            }
-            u.dof = dof;
-            u.joints = joints;
-        }
-        appState.updateMechanism(type, u);
+    } else if (s.mechanisms.hasOwnProperty(type)) {
+        _applyMechanism(type, s);
     } else if (type==='vision') {
         const v = appState.getState().vision;
         for (let i = 0; i < v.cameraCount; i++) {
@@ -756,6 +667,149 @@ export function applySidebarConfig(type) {
         appState.updateStateMachine({jsonData: document.getElementById('cfg-sm-json')?.value||''});
     }
 }
+
+/**
+ * Registry-driven mechanism config reader.
+ * Reads common fields from DOM, then dispatches to type-specific readers.
+ */
+function _applyMechanism(type, s) {
+    const m = s.mechanisms[type];
+    if (!m) return;
+
+    // Handle arm separately (joint-based, not motor-array)
+    if (type === 'arm') {
+        const dof = parseInt(document.getElementById('cfg-arm-dof')?.value) || m.dof;
+        const joints = [];
+        for (let i = 0; i < dof; i++) {
+            const hasFollower = document.getElementById(`cfg-arm-joint-${i}-hasfollower`)?.checked || false;
+            const motors = [
+                {
+                    type: document.getElementById(`cfg-arm-joint-${i}-leader-motor`)?.value || null,
+                    canId: parseInt(document.getElementById(`cfg-arm-joint-${i}-leader-canid`)?.value) || (30 + i * 2),
+                    inverted: document.getElementById(`cfg-arm-joint-${i}-leader-inv`)?.checked || false,
+                    role: 'leader'
+                }
+            ];
+            if (hasFollower) {
+                motors.push({
+                    type: document.getElementById(`cfg-arm-joint-${i}-follower-motor`)?.value || null,
+                    canId: parseInt(document.getElementById(`cfg-arm-joint-${i}-follower-canid`)?.value) || (31 + i * 2),
+                    inverted: document.getElementById(`cfg-arm-joint-${i}-follower-inv`)?.checked || false,
+                    role: 'follower'
+                });
+            }
+            joints.push({
+                motors,
+                gearRatio: parseFloat(document.getElementById(`cfg-arm-joint-${i}-ratio`)?.value) || null,
+                encoder: document.getElementById(`cfg-arm-joint-${i}-encoder`)?.value || null,
+                encoderId: parseInt(document.getElementById(`cfg-arm-joint-${i}-encoder-id`)?.value) || (31 + i * 2),
+                motorConfig: {
+                    currentLimit: parseInt(document.getElementById(`cfg-arm-joint-${i}-curlimit`)?.value) || 40,
+                    brakeMode: true
+                },
+                softLimitFwd: parseFloat(document.getElementById(`cfg-arm-joint-${i}-softfwd`)?.value) || null,
+                softLimitRev: parseFloat(document.getElementById(`cfg-arm-joint-${i}-softrev`)?.value) || null,
+                pid: {
+                    kP: parseFloat(document.getElementById(`cfg-arm-joint-${i}-kp`)?.value) || 0,
+                    kI: parseFloat(document.getElementById(`cfg-arm-joint-${i}-ki`)?.value) || 0,
+                    kD: parseFloat(document.getElementById(`cfg-arm-joint-${i}-kd`)?.value) || 0,
+                    kS: 0, kV: 0, kA: 0
+                }
+            });
+        }
+        const attachedTo = document.getElementById(`cfg-${type}-attached`)?.value;
+        appState.updateMechanism('arm', { dof, joints, attachedTo: attachedTo || m.attachedTo });
+        return;
+    }
+
+    // Standard multi-motor mechanism
+    m.motors.forEach((mot, i) => {
+        appState.updateMotor(type, i, {
+            type: document.getElementById(`cfg-${type}-motor-${i}`)?.value || null,
+            canId: parseInt(document.getElementById(`cfg-${type}-canid-${i}`)?.value) || mot.canId,
+            inverted: document.getElementById(`cfg-${type}-inv-${i}`)?.checked || false,
+            role: document.getElementById(`cfg-${type}-role-${i}`)?.value || mot.role,
+        });
+    });
+
+    const brakeVal = document.querySelector(`input[name="cfg-${type}-brakemode"]:checked`)?.value;
+    const mc = {
+        currentLimit: parseInt(document.getElementById(`cfg-${type}-curlimit`)?.value) || 40,
+        brakeMode: brakeVal !== 'coast',
+    };
+    const pid = m.pid ? {
+        kP: parseFloat(document.getElementById(`cfg-${type}-kp`)?.value) || 0,
+        kI: parseFloat(document.getElementById(`cfg-${type}-ki`)?.value) || 0,
+        kD: parseFloat(document.getElementById(`cfg-${type}-kd`)?.value) || 0,
+        kS: parseFloat(document.getElementById(`cfg-${type}-ks`)?.value) || 0,
+        kV: parseFloat(document.getElementById(`cfg-${type}-kv`)?.value) || 0,
+        kA: parseFloat(document.getElementById(`cfg-${type}-ka`)?.value) || 0,
+    } : undefined;
+    const attachedTo = document.getElementById(`cfg-${type}-attached`)?.value;
+    const u = {
+        gearRatio: parseFloat(document.getElementById(`cfg-${type}-ratio`)?.value) || null,
+        motorConfig: mc,
+        attachedTo: attachedTo || m.attachedTo,
+    };
+    if (pid) u.pid = pid;
+    if ('rampRate' in m) u.rampRate = parseFloat(document.getElementById(`cfg-${type}-ramp`)?.value) || 0;
+
+    // Type-specific extras
+    if (type === 'elevator') {
+        u.encoder = document.getElementById('cfg-elevator-encoder')?.value || null;
+        u.encoderId = parseInt(document.getElementById('cfg-elevator-enc-id')?.value) || 53;
+        u.minHeight = parseFloat(document.getElementById('cfg-elevator-min')?.value) || 0;
+        u.maxHeight = parseFloat(document.getElementById('cfg-elevator-max')?.value) || null;
+        u.softLimitFwd = parseFloat(document.getElementById('cfg-elevator-softfwd')?.value) || null;
+        u.softLimitRev = parseFloat(document.getElementById('cfg-elevator-softrev')?.value) || null;
+        u.motionMaxVel = parseFloat(document.getElementById('cfg-elevator-mmvel')?.value) || null;
+        u.motionMaxAccel = parseFloat(document.getElementById('cfg-elevator-mmacc')?.value) || null;
+    }
+    if (type === 'shooter') {
+        u.maxRPM = parseInt(document.getElementById('cfg-shooter-rpm')?.value) || null;
+        if (m.shooterType === 'adjustable' || m.shooterType === 'adjustable_turret') {
+            u.pivotMotor = {
+                type: document.getElementById('cfg-shooter-pivot-motor')?.value || null,
+                canId: parseInt(document.getElementById('cfg-shooter-pivot-canid')?.value) || 24,
+                inverted: document.getElementById('cfg-shooter-pivot-inv')?.checked || false,
+            };
+        }
+        if (m.shooterType === 'adjustable_turret') {
+            u.turretMotor = {
+                type: document.getElementById('cfg-shooter-turret-motor')?.value || null,
+                canId: parseInt(document.getElementById('cfg-shooter-turret-canid')?.value) || 25,
+                inverted: document.getElementById('cfg-shooter-turret-inv')?.checked || false,
+            };
+        }
+    }
+    if (type === 'intake') {
+        u.hasSensor = document.getElementById('cfg-intake-sensor')?.checked || false;
+        u.sensorPortType = document.getElementById('cfg-intake-sensor-type')?.value || 'dio';
+        u.sensorPort = parseInt(document.getElementById('cfg-intake-sensor-port')?.value) || 0;
+    }
+    if (type === 'launcher') {
+        u.softLimitFwd = parseFloat(document.getElementById('cfg-launcher-softfwd')?.value) || null;
+        u.softLimitRev = parseFloat(document.getElementById('cfg-launcher-softrev')?.value) || null;
+        u.hasSensor = document.getElementById('cfg-launcher-sensor')?.checked || false;
+        u.sensorPortType = document.getElementById('cfg-launcher-sensor-type')?.value || 'dio';
+        u.sensorPort = parseInt(document.getElementById('cfg-launcher-sensor-port')?.value) || 1;
+    }
+
+    // Capture physics parameters (optional, for simulation fidelity)
+    const massVal = parseFloat(document.getElementById(`cfg-${type}-mass`)?.value);
+    const moiVal = parseFloat(document.getElementById(`cfg-${type}-moi`)?.value);
+    if (!isNaN(massVal) || !isNaN(moiVal)) {
+        u.physics = {
+            massKg: isNaN(massVal) ? (m.physics?.massKg || null) : massVal,
+            moiKgM2: isNaN(moiVal) ? (m.physics?.moiKgM2 || null) : moiVal,
+        };
+    }
+
+    appState.updateMechanism(type, u);
+}
+
+
+
 
 function bindRadio(name, cb) {
     document.querySelectorAll(`[data-name="${name}"]`).forEach(card => {

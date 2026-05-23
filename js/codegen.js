@@ -4,20 +4,66 @@
 import { MOTORS, ENCODERS, GYROS } from './constants.js';
 import { genTankIOReal, genDriveIOSim, genSwerveDriveIOReal, genSwerveDriveIOSim } from './templates/drive.js';
 import { genMechIOReal, genMechIOSim } from './templates/mech.js';
+import { genSysIdBindings, genSysIdChooserField, genSysIdImports } from './templates/sysid.js';
+import { VERSION_PROFILE } from './versions.js';
+import { buildManifest, addManifestToZip, genMergeSnippets, GEN_MODE } from './manifest.js';
 
-export async function generateProject(state, projectName = 'FRCRobotProject') {
+export async function generateProject(state, projectName = 'FRCRobotProject', mode = GEN_MODE.FULL) {
     const zip = new JSZip();
     const base = projectName;
     const fw = state.framework || 'advantagekit';
-    zip.file(`${base}/build.gradle`, genBuildGradle(state));
-    zip.file(`${base}/README.md`, genReadme(state, projectName));
-    zip.file(`${base}/settings.gradle`, `pluginManagement {\n  repositories {\n    mavenLocal()\n    gradlePluginPortal()\n    maven { url "https://frcmaven.wpi.edu/artifactory/release" }\n  }\n}\n`);
+    const generatedFiles = [];
+
+    function addFile(path, content) {
+        zip.file(path, content);
+        generatedFiles.push(path.replace(`${base}/`, ''));
+    }
+
+    // Libraries-only mode: just build.gradle + vendordeps
+    if (mode === GEN_MODE.LIBRARIES_ONLY) {
+        addFile(`${base}/build.gradle`, genBuildGradle(state));
+        addVendordeps(zip, base, state);
+        const manifest = buildManifest(state, projectName, mode);
+        addManifestToZip(zip, base, manifest, generatedFiles);
+        const blob = await zip.generateAsync({ type: 'blob' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `${projectName}-libraries.zip`;
+        a.click();
+        return;
+    }
+
+    // Add-mechanism mode: generate new mechanism files + merge instructions
+    if (mode === GEN_MODE.ADD_MECHANISM) {
+        const newMechs = Object.entries(state.mechanisms).filter(([, m]) => m.configured);
+        const pkg = `${base}/src/main/java/frc/robot`;
+        let mergeDoc = `# Merge Instructions\n\nGenerated: ${new Date().toISOString()}\n\n`;
+        newMechs.forEach(([type, m]) => {
+            genMechSubsystem(zip, pkg, type, m, state, fw);
+            mergeDoc += genMergeSnippets(type, state, fw);
+        });
+        addFile(`${base}/MERGE_INSTRUCTIONS.md`, mergeDoc);
+        addFile(`${base}/Constants-additions.java`, genConstantsAdditions(state));
+        const manifest = buildManifest(state, projectName, mode);
+        addManifestToZip(zip, base, manifest, generatedFiles);
+        const blob = await zip.generateAsync({ type: 'blob' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `${projectName}-add-mechanism.zip`;
+        a.click();
+        return;
+    }
+
+    // Full project generation (default)
+    addFile(`${base}/build.gradle`, genBuildGradle(state));
+    addFile(`${base}/README.md`, genReadme(state, projectName));
+    addFile(`${base}/settings.gradle`, `pluginManagement {\n  repositories {\n    mavenLocal()\n    gradlePluginPortal()\n    maven { url "https://frcmaven.wpi.edu/artifactory/release" }\n  }\n}\n`);
     addVendordeps(zip, base, state);
     const pkg = `${base}/src/main/java/frc/robot`;
-    zip.file(`${pkg}/Main.java`, genMain());
-    zip.file(`${pkg}/Robot.java`, genRobot(fw));
-    zip.file(`${pkg}/Constants.java`, genConstants(state));
-    zip.file(`${pkg}/RobotContainer.java`, genRobotContainer(state));
+    addFile(`${pkg}/Main.java`, genMain());
+    addFile(`${pkg}/Robot.java`, genRobot(fw));
+    addFile(`${pkg}/Constants.java`, genConstants(state));
+    addFile(`${pkg}/RobotContainer.java`, genRobotContainer(state));
     if (state.chassis.configured) genDriveSubsystem(zip, pkg, state, fw);
     Object.entries(state.mechanisms).forEach(([type, m]) => { if (m.configured) genMechSubsystem(zip, pkg, type, m, state, fw); });
     if (state.vision.configured) genVisionSubsystem(zip, pkg, state, fw);
@@ -30,6 +76,11 @@ export async function generateProject(state, projectName = 'FRCRobotProject') {
         if (state.chassis.type === 'swerve') genAutos(zip, pkg, state);
     }
     zip.file(`${base}/src/main/deploy/.gitkeep`, '');
+
+    // Add manifest
+    const manifest = buildManifest(state, projectName, GEN_MODE.FULL);
+    addManifestToZip(zip, base, manifest, generatedFiles);
+
     const blob = await zip.generateAsync({ type: 'blob' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
@@ -37,13 +88,42 @@ export async function generateProject(state, projectName = 'FRCRobotProject') {
     a.click();
 }
 
+/** Generate only the Constants additions for new mechanisms (used in add-mechanism mode) */
+function genConstantsAdditions(state) {
+    let o = `// === ADD THESE TO YOUR EXISTING Constants.java ===\n\n`;
+    Object.entries(state.mechanisms).forEach(([type, m]) => {
+        if (!m.configured) return;
+        const N = type.charAt(0).toUpperCase() + type.slice(1);
+        o += `    // @generated:${type}\n`;
+        o += `    public static final class ${N}Constants {\n`;
+        (m.motors || []).forEach((mot, i) => {
+            const label = i === 0 ? 'MOTOR_ID' : `FOLLOWER_${i}_ID`;
+            o += `        public static final int ${label} = ${mot.canId};\n`;
+        });
+        if (m.motorConfig) {
+            o += `        public static final int CURRENT_LIMIT = ${m.motorConfig.currentLimit || 40};\n`;
+            o += `        public static final boolean BRAKE_MODE = ${m.motorConfig.brakeMode !== false};\n`;
+        }
+        if (m.pid) {
+            o += `        public static final double kP = ${m.pid.kP || 0};\n`;
+            o += `        public static final double kI = ${m.pid.kI || 0};\n`;
+            o += `        public static final double kD = ${m.pid.kD || 0};\n`;
+            o += `        public static final double kS = ${m.pid.kS || 0};\n`;
+            o += `        public static final double kV = ${m.pid.kV || 0};\n`;
+            o += `        public static final double kA = ${m.pid.kA || 0};\n`;
+        }
+        o += `    }\n    // @end-generated:${type}\n\n`;
+    });
+    return o;
+}
+
 function genBuildGradle(s) {
     return `plugins {
     id "java"
-    id "edu.wpi.first.GradleRIO" version "2026.2.1"
+    id "edu.wpi.first.GradleRIO" version "${VERSION_PROFILE.gradleRIO}"
 }
-sourceCompatibility = JavaVersion.VERSION_17
-targetCompatibility = JavaVersion.VERSION_17
+sourceCompatibility = JavaVersion.${VERSION_PROFILE.javaVersion}
+targetCompatibility = JavaVersion.${VERSION_PROFILE.javaVersion}
 def ROBOT_MAIN_CLASS = "frc.robot.Main"
 deploy { targets { roborio(getTargetTypeClass('RoboRIO')) { team = project.frc.getTeamNumber(); directory = '/home/lvuser/deploy'; artifacts { frcJava(getArtifactTypeClass('FRCJavaArtifact')) { } } } } }
 wpi.java.debugJni = false
@@ -64,14 +144,19 @@ dependencies {
 
 function addVendordeps(zip, base, state) {
     const vd = `${base}/vendordeps`;
-    // AdvantageKit (always)
-    zip.file(`${vd}/AdvantageKit.json`, JSON.stringify({
-        fileName: "AdvantageKit.json", name: "AdvantageKit", version: "2026.1.0",
-        uuid: "d94427e6-503d-4de9-b18b-474d5fd2a645", frcYear: "2026",
-        mavenUrls: ["https://github.com/Mechanical-Advantage/AdvantageKit/releases/download/v2026.1.0/"],
-        jsonUrl: "", javaDependencies: [{ groupId: "org.littletonrobotics.akit", artifactId: "akit-java", version: "2026.1.0" }],
-        jniDependencies: [], cppDependencies: []
-    }, null, 2));
+    const VP = VERSION_PROFILE;
+    
+    // AdvantageKit (always for advantagekit framework)
+    if (state.framework === 'advantagekit' || !state.framework) {
+        const ak = VP.vendordeps.advantagekit;
+        zip.file(`${vd}/${ak.fileName}`, JSON.stringify({
+            fileName: ak.fileName, name: ak.name, version: ak.version,
+            uuid: ak.uuid, frcYear: VP.frcYear,
+            mavenUrls: ak.mavenUrls, jsonUrl: '',
+            javaDependencies: ak.javaDependencies,
+            jniDependencies: [], cppDependencies: []
+        }, null, 2));
+    }
 
     // Detect which vendors we need
     const vendors = new Set();
@@ -89,49 +174,35 @@ function addVendordeps(zip, base, state) {
     });
     if (state.vision.configured && state.vision.system === 'photonvision') vendors.add('photonvision');
 
-    if (vendors.has('ctre')) {
-        zip.file(`${vd}/Phoenix6.json`, JSON.stringify({
-            fileName: "Phoenix6.json", name: "CTRE-Phoenix (v6)", version: "26.0.0", frcYear: "2026",
-            mavenUrls: ["https://maven.ctr-electronics.com/release/"],
-            jsonUrl: "https://maven.ctr-electronics.com/release/com/ctre/phoenix6/latest/Phoenix6-frc2026-latest.json",
-            javaDependencies: [{ groupId: "com.ctre.phoenix6", artifactId: "wpiapi-java", version: "26.0.0" }],
-            jniDependencies: [], cppDependencies: []
-        }, null, 2));
-    }
-    if (vendors.has('rev')) {
-        zip.file(`${vd}/REVLib.json`, JSON.stringify({
-            fileName: "REVLib.json", name: "REVLib", version: "2026.1.1", frcYear: "2026",
-            mavenUrls: ["https://maven.revrobotics.com/release/"],
-            jsonUrl: "https://software-metadata.revrobotics.com/REVLib-2026.json",
-            javaDependencies: [{ groupId: "com.revrobotics.frc", artifactId: "REVLib-java", version: "2026.1.1" }],
-            jniDependencies: [], cppDependencies: []
-        }, null, 2));
-    }
-    if (vendors.has('kauai')) {
-        zip.file(`${vd}/NavX.json`, JSON.stringify({
-            fileName: "NavX.json", name: "NavX", version: "2026.2.0", frcYear: "2026",
-            mavenUrls: ["https://dev.studica.com/maven/release/2026/"],
-            jsonUrl: "https://dev.studica.com/releases/2026/NavX.json",
-            javaDependencies: [{ groupId: "com.kauailabs.navx.frc", artifactId: "navx-frc-java", version: "2026.2.0" }],
-            jniDependencies: [], cppDependencies: []
-        }, null, 2));
-    }
-    if (vendors.has('photonvision')) {
-        zip.file(`${vd}/photonlib.json`, JSON.stringify({
-            fileName: "photonlib.json", name: "photonlib", version: "2026.2.1", frcYear: "2026",
-            mavenUrls: ["https://maven.photonvision.org/repository/internal", "https://maven.photonvision.org/repository/snapshots"],
-            jsonUrl: "https://maven.photonvision.org/repository/internal/org/photonvision/photonlib-json/1.0/photonlib-json-1.0.json",
-            javaDependencies: [{ groupId: "org.photonvision", artifactId: "photonlib-java", version: "2026.2.1" }],
-            jniDependencies: [], cppDependencies: []
-        }, null, 2));
-    }
+    // Map vendor keys to vendordep entries
+    const vendorMap = {
+        ctre: VP.vendordeps.phoenix6,
+        rev: VP.vendordeps.revlib,
+        kauai: VP.vendordeps.navx,
+        photonvision: VP.vendordeps.photonlib,
+    };
+    
+    vendors.forEach(v => {
+        const dep = vendorMap[v];
+        if (dep) {
+            zip.file(`${vd}/${dep.fileName}`, JSON.stringify({
+                fileName: dep.fileName, name: dep.name, version: dep.version,
+                frcYear: VP.frcYear, mavenUrls: dep.mavenUrls,
+                jsonUrl: dep.jsonUrl || '',
+                javaDependencies: dep.javaDependencies,
+                jniDependencies: [], cppDependencies: []
+            }, null, 2));
+        }
+    });
+
     // PathPlannerLib
     if (state.chassis.configured && state.chassis.pathplannerEnabled !== false) {
-        zip.file(`${vd}/PathplannerLib.json`, JSON.stringify({
-            fileName: "PathplannerLib.json", name: "PathplannerLib", version: "2026.3.0", frcYear: "2026",
-            mavenUrls: ["https://3015rangerrobotics.github.io/pathplannerlib/repo"],
-            jsonUrl: "https://3015rangerrobotics.github.io/pathplannerlib/PathplannerLib.json",
-            javaDependencies: [{ groupId: "com.pathplanner.lib", artifactId: "PathplannerLib-java", version: "2026.3.0" }],
+        const pp = VP.vendordeps.pathplanner;
+        zip.file(`${vd}/${pp.fileName}`, JSON.stringify({
+            fileName: pp.fileName, name: pp.name, version: pp.version,
+            frcYear: VP.frcYear, mavenUrls: pp.mavenUrls,
+            jsonUrl: pp.jsonUrl || '',
+            javaDependencies: pp.javaDependencies,
             jniDependencies: [], cppDependencies: []
         }, null, 2));
     }
@@ -145,7 +216,8 @@ function genRobot(fw) {
     if (fw === 'commandbase') {
         return `package frc.robot;\nimport edu.wpi.first.wpilibj.TimedRobot;\nimport edu.wpi.first.wpilibj2.command.Command;\nimport edu.wpi.first.wpilibj2.command.CommandScheduler;\n\npublic class Robot extends TimedRobot {\n    private Command autonomousCommand;\n    private RobotContainer robotContainer;\n    @Override public void robotInit() { robotContainer = new RobotContainer(); }\n    @Override public void robotPeriodic() { CommandScheduler.getInstance().run(); }\n    @Override public void autonomousInit() { autonomousCommand = robotContainer.getAutonomousCommand(); if (autonomousCommand != null) autonomousCommand.schedule(); }\n    @Override public void teleopInit() { if (autonomousCommand != null) autonomousCommand.cancel(); }\n    @Override public void testInit() { CommandScheduler.getInstance().cancelAll(); }\n}\n`;
     }
-    return `package frc.robot;\nimport edu.wpi.first.wpilibj2.command.Command;\nimport edu.wpi.first.wpilibj2.command.CommandScheduler;\nimport org.littletonrobotics.junction.LoggedRobot;\nimport org.littletonrobotics.junction.Logger;\n\npublic class Robot extends LoggedRobot {\n    private Command autonomousCommand;\n    private RobotContainer robotContainer;\n    @Override public void robotInit() { Logger.start(); robotContainer = new RobotContainer(); }\n    @Override public void robotPeriodic() { CommandScheduler.getInstance().run(); }\n    @Override public void autonomousInit() { autonomousCommand = robotContainer.getAutonomousCommand(); if (autonomousCommand != null) autonomousCommand.schedule(); }\n    @Override public void teleopInit() { if (autonomousCommand != null) autonomousCommand.cancel(); }\n    @Override public void testInit() { CommandScheduler.getInstance().cancelAll(); }\n}\n`;
+    const ak = VERSION_PROFILE.advantagekitApi;
+    return `package frc.robot;\nimport edu.wpi.first.wpilibj2.command.Command;\nimport edu.wpi.first.wpilibj2.command.CommandScheduler;\nimport ${ak.robotBaseImport};\nimport ${ak.loggerImport};\n\npublic class Robot extends ${ak.robotBaseClass} {\n    private Command autonomousCommand;\n    private RobotContainer robotContainer;\n    @Override public void robotInit() { ${ak.logStart}; robotContainer = new RobotContainer(); }\n    @Override public void robotPeriodic() { CommandScheduler.getInstance().run(); }\n    @Override public void autonomousInit() { autonomousCommand = robotContainer.getAutonomousCommand(); if (autonomousCommand != null) autonomousCommand.schedule(); }\n    @Override public void teleopInit() { if (autonomousCommand != null) autonomousCommand.cancel(); }\n    @Override public void testInit() { CommandScheduler.getInstance().cancelAll(); }\n}\n`;
 }
 
 function genConstants(s) {
@@ -263,6 +335,9 @@ function genConstants(s) {
                 if (pid.kV) o += `        public static final double kV = ${pid.kV};\n`;
                 if (pid.kA) o += `        public static final double kA = ${pid.kA};\n`;
             }
+            // Physics simulation constants (optional)
+            if (m.physics?.massKg) o += `        /** Mass used in simulation physics model */\n        public static final double SIM_MASS_KG = ${m.physics.massKg};\n`;
+            if (m.physics?.moiKgM2) o += `        /** Moment of inertia used in simulation physics model */\n        public static final double SIM_MOI_KG_M2 = ${m.physics.moiKgM2};\n`;
         }
         o += `    }\n\n`;
     });
@@ -332,6 +407,16 @@ function genRobotContainer(s) {
             init += `        vision = new Vision();\n`;
         }
     }
+    // Collect SysId-capable mechanisms (arm excluded — uses joint-based control)
+    const configuredMechs = Object.entries(s.mechanisms)
+        .filter(([t, m]) => m.configured && t !== 'arm')
+        .map(([t]) => ({ name: t, varName: t, displayName: t.charAt(0).toUpperCase() + t.slice(1) }));
+    const sysIdTotal = (s.chassis.configured ? 1 : 0) + configuredMechs.length;
+    bindings += genSysIdBindings(configuredMechs, s.chassis.configured);
+    if (sysIdTotal > 0) {
+        imp += genSysIdImports(sysIdTotal);
+    }
+    fields += genSysIdChooserField(sysIdTotal);
     const autoReturn = pp
         ? '        return Autos.getAuto(drive);\n'
         : '        return Commands.print("No autonomous configured");\n';
@@ -558,7 +643,7 @@ function genPathPlannerAssets(zip, base, state) {
     zip.file(`${deploy}/paths/.gitkeep`, '');
     zip.file(`${deploy}/autos/.gitkeep`, '');
     zip.file(`${deploy}/paths/Example Path.path`, JSON.stringify({
-        version: '2026.0',
+        version: VERSION_PROFILE.pathplannerFormat,
         waypoints: [
             { anchor: { x: 1.5, y: 5.5 }, prevWaypoint: null, nextWaypoint: { x: 2.0, y: 5.5 } },
             { anchor: { x: 3.0, y: 5.5 }, prevWaypoint: { x: 2.5, y: 5.5 }, nextWaypoint: null },
@@ -567,7 +652,7 @@ function genPathPlannerAssets(zip, base, state) {
         goalEndState: { velocity: 0, rotation: 0 },
     }, null, 2));
     zip.file(`${deploy}/autos/Example Auto.auto`, JSON.stringify({
-        version: '2026.0',
+        version: VERSION_PROFILE.pathplannerFormat,
         name: 'Example Auto',
         folder: 'autos',
         choreoAuto: false,
@@ -607,19 +692,17 @@ During the configuration stage, you might have left PID and feedforward constant
 SysId is the official WPILib system identification tool used to calculate optimal feedforward (kS, kV, kA) and feedback (kP, kI, kD) gains for your robot's mechanisms.
 
 ### 2. How to Run SysId on this Codebase
-Every mechanism subsystem (Elevator, Shooter, Intake, or Drive) generated in this codebase comes pre-equipped with SysId routines:
-- Quasistatic test: \`sysIdQuasistatic(Direction)\`
-- Dynamic test: \`sysIdDynamic(Direction)\`
+Every mechanism subsystem comes pre-equipped with SysId routines, and **all button bindings are automatically generated** in \`RobotContainer.java\`.
+
+You do NOT need to manually wire any buttons. The generated bindings are:
+- **Drive**: A/B/X/Y buttons for quasistatic/dynamic forward/reverse
+- **Additional mechanisms**: D-Pad, Bumpers/Triggers, or dashboard chooser
 
 To run characterization:
-1. Open your generated project using **VS Code** (with the FRC Game Tools / WPILib extension installed).
-2. Wire up buttons on your joystick/controller inside \`RobotContainer.java\` to trigger these routines during test or teleop mode, for example:
-   \`\`\`java
-   controller.a().whileTrue(elevator.sysIdQuasistatic(SysIdRoutine.Direction.kForward));
-   \`\`\`
-3. Run the robot in simulation or deploy to the RoboRIO.
-4. Open the **SysId desktop application** from WPILib.
-5. Record telemetry data over NetworkTables, then analyze the logs to obtain the feedforward and feedback constants.
+1. Deploy the generated project to your RoboRIO or run in simulation.
+2. The SysId bindings are already wired — just press the corresponding buttons.
+3. Open the **SysId desktop application** from WPILib.
+4. Record telemetry data, then analyze logs for feedforward/feedback constants.
 
 ### 3. Where to Update PID/FF Values in Code
 Once you have obtained the values, open the following file:

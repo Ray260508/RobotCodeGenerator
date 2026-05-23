@@ -2,6 +2,7 @@
  * Java motor hardware templates — CTRE TalonFX / REV SparkMax
  */
 import { MOTORS } from '../constants.js';
+import { VERSION_PROFILE } from '../versions.js';
 
 export function isCTRE(motorKey) {
     return motorKey && MOTORS[motorKey]?.vendor === 'ctre';
@@ -13,22 +14,10 @@ export function isREV(motorKey) {
 
 export function motorImports(motorKey) {
     if (isCTRE(motorKey)) {
-        return `import com.ctre.phoenix6.hardware.TalonFX;
-import com.ctre.phoenix6.controls.VoltageOut;
-import com.ctre.phoenix6.controls.PositionVoltage;
-import com.ctre.phoenix6.configs.TalonFXConfiguration;
-import com.ctre.phoenix6.signals.NeutralModeValue;
-import com.ctre.phoenix6.signals.InvertedValue;
-`;
+        return VERSION_PROFILE.motorApi.ctre.imports.map(i => `import ${i};`).join('\n') + '\n';
     }
     if (isREV(motorKey)) {
-        return `import com.revrobotics.spark.SparkMax;
-import com.revrobotics.spark.SparkLowLevel.MotorType;
-import com.revrobotics.spark.config.SparkMaxConfig;
-import com.revrobotics.spark.config.SparkBaseConfig.IdleMode;
-import com.revrobotics.RelativeEncoder;
-import com.revrobotics.spark.SparkBase.ControlType;
-`;
+        return VERSION_PROFILE.motorApi.rev.imports.map(i => `import ${i};`).join('\n') + '\n';
     }
     return '';
 }

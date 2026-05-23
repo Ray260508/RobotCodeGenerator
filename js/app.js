@@ -5,6 +5,7 @@ import appState from './state.js';
 import { renderSidebar, applySidebarConfig } from './sidebar.js';
 import { initParticles, showToast } from './renderer.js';
 import { generateProject } from './codegen.js';
+import { GEN_MODE } from './manifest.js';
 import { initViewport, zoomToMechanism, resetZoom as resetViewportZoom, updateMechConfigured, setMechVisible, update3DModel } from './viewport3d.js';
 import { renderSummary } from './summary.js';
 
@@ -258,7 +259,9 @@ function bindGeneration() {
         }
         try {
             const projName = document.getElementById('project-name-input')?.value || 'FRC2026_Robot';
-            await generateProject(appState.getState(), projName);
+            const modeEl = document.querySelector('input[name="gen-mode"]:checked');
+            const mode = modeEl ? modeEl.value : GEN_MODE.FULL;
+            await generateProject(appState.getState(), projName, mode);
             status.textContent = '✓ Download started!';
             setTimeout(() => genOverlay.style.display = 'none', 1500);
             showToast('Code generated!', 'success');

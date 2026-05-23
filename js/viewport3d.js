@@ -27,6 +27,7 @@ let mechGroups = {};
 let animationId;
 let currentZoomTarget = null;
 let isInitialized = false;
+let isVisible = true;
 
 export function initViewport(container) {
     if (isInitialized) return;
@@ -113,12 +114,23 @@ export function initViewport(container) {
     window.addEventListener('resize', onResize);
 
     function animate() {
+        if (!isVisible) {
+            animationId = requestAnimationFrame(animate);
+            return;
+        }
         animationId = requestAnimationFrame(animate);
         controls.update();
         if (!currentZoomTarget) robotGroup.rotation.y += 0.0015;
         renderer.render(scene, camera);
     }
     animate();
+
+    // Pause rendering when viewport is not visible (performance)
+    const observer = new IntersectionObserver(
+        ([entry]) => { isVisible = entry.isIntersecting; },
+        { threshold: 0.05 }
+    );
+    observer.observe(container);
 }
 
 function mat(color, opacity = 1) {
@@ -354,13 +366,35 @@ export function updateMechConfigured(type, configured) {
     });
 }
 
+/**
+ * Properly dispose all Three.js geometry and materials in a group to prevent GPU memory leaks.
+ */
+function clearGroup(group) {
+    const toDispose = [];
+    group.traverse(obj => {
+        if (obj.geometry) toDispose.push(obj.geometry);
+        if (obj.material) {
+            const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+            mats.forEach(m => {
+                // Dispose any textures
+                Object.values(m).forEach(v => {
+                    if (v && v.isTexture) v.dispose();
+                });
+                m.dispose();
+            });
+        }
+    });
+    toDispose.forEach(g => g.dispose());
+    while (group.children.length > 0) group.remove(group.children[0]);
+}
+
 export function dispose() {
     if (animationId) cancelAnimationFrame(animationId);
     renderer?.dispose();
 }
 
 export function buildShooterPlaceholder(type, group) {
-    while(group.children.length > 0){ group.remove(group.children[0]); }
+    clearGroup(group);
     const sp = POSITIONS.shooter;
     const matShooter = new THREE.MeshStandardMaterial({ color: COLORS.shooter, roughness: 0.6 });
     if (type === 'adjustable_turret') {
@@ -399,11 +433,10 @@ export function update3DModel(type, state) {
     const grp = mechGroups[type];
     if (!grp) return;
     
-    // Clear old meshes
-    while (grp.children.length > 0) {
-        grp.remove(grp.children[0]);
-    }
+    // Clear old meshes and dispose GPU resources
+    clearGroup(grp);
     
+
     const loader = new GLTFLoader();
     
     if (type === 'chassis') {

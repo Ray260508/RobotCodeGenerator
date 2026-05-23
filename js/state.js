@@ -3,6 +3,10 @@
  * Framework selection, multi-motor, detailed motor configs, simulation attach rules
  */
 import { DEFAULT_CAN_IDS } from './constants.js';
+import { initializeRegistry } from './mechanisms/index.js';
+import { buildDefaultMechanismsState, getAllMechanisms } from './registry.js';
+
+initializeRegistry();
 
 function defaultMotorConfig() {
     return {
@@ -58,86 +62,16 @@ const DEFAULT_STATE = {
         motorConfig: defaultMotorConfig(),
     },
 
-    mechanisms: {
-        elevator: {
-            configured: false, enabled: false,
-            motors: [defaultMotorEntry(null, DEFAULT_CAN_IDS.elevator.motor)],
-            encoder: null, gearRatio: null,
-            maxHeight: null, minHeight: 0,
-            encoderId: DEFAULT_CAN_IDS.elevator.encoder,
-            motorConfig: { ...defaultMotorConfig(), currentLimit: 40 },
-            pid: defaultPIDConfig(),
-            rampRate: 20,
-            softLimitFwd: null, softLimitRev: null,
-            motionMaxVel: null, motionMaxAccel: null,
-            attachedTo: 'chassis',
-        },
-        shooter: {
-            configured: false, enabled: false,
-            motors: [defaultMotorEntry(null, DEFAULT_CAN_IDS.shooter.motor)],
-            shooterType: 'adjustable',
-            turretMotor: defaultMotorEntry(null, 25, 'turret'),
-            encoder: null, gearRatio: null, maxRPM: null,
-            motorConfig: { ...defaultMotorConfig(), currentLimit: 60 },
-            pid: defaultPIDConfig(),
-            rampRate: 20,
-            attachedTo: 'chassis',
-        },
-        intake: {
-            configured: false, enabled: false,
-            motors: [defaultMotorEntry(null, DEFAULT_CAN_IDS.intake.motor)],
-            gearRatio: null,
-            hasSensor: false, sensorPortType: 'dio', sensorPort: DEFAULT_CAN_IDS.intake.sensor,
-            motorConfig: { ...defaultMotorConfig(), currentLimit: 30 },
-            rampRate: 20,
-            pid: null,
-            attachedTo: 'chassis',
-        },
-        roller: {
-            configured: false, enabled: false,
-            motors: [defaultMotorEntry(null, DEFAULT_CAN_IDS.roller.motor)],
-            gearRatio: null,
-            motorConfig: { ...defaultMotorConfig(), currentLimit: 30 },
-            rampRate: 20,
-            pid: null,
-            attachedTo: 'chassis',
-        },
-        launcher: {
-            configured: false, enabled: false,
-            motors: [defaultMotorEntry(null, DEFAULT_CAN_IDS.launcher.motor)],
-            hasSensor: false, sensorPortType: 'dio', sensorPort: DEFAULT_CAN_IDS.launcher.sensor,
-            motorConfig: { ...defaultMotorConfig(), currentLimit: 20 },
-            pid: defaultPIDConfig(),
-            rampRate: 20,
-            softLimitFwd: null, softLimitRev: null,
-            attachedTo: 'arm',
-        },
-        arm: {
-            configured: false, enabled: false,
-            dof: 1,
-            joints: [
-                {
-                    motors: [defaultMotorEntry(null, 30)],
-                    encoder: null, encoderId: 31,
-                    gearRatio: null,
-                    motorConfig: { ...defaultMotorConfig(), currentLimit: 40 },
-                    pid: defaultPIDConfig(),
-                    softLimitFwd: null, softLimitRev: null,
-                }
-            ],
-            attachedTo: 'chassis',
-        }
-    },
+    mechanisms: buildDefaultMechanismsState(),
 
     // Valid simulation parent targets per mechanism (sidebar only)
-    attachmentRules: {
-        elevator: ['chassis'],
-        arm: ['chassis', 'elevator'],
-        shooter: ['chassis', 'elevator', 'arm'],
-        intake: ['chassis'],
-        roller: ['chassis', 'elevator', 'arm'],
-        launcher: ['elevator', 'arm', 'intake'],
-    },
+    attachmentRules: (() => {
+        const rules = {};
+        getAllMechanisms().forEach(m => {
+            rules[m.id] = m.validAttachments;
+        });
+        return rules;
+    })(),
 
     vision: {
         configured: false, enabled: false,

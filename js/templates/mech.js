@@ -5,6 +5,7 @@ import { MOTORS } from '../constants.js';
 import {
     motorImports, genMotorInit, genSetVoltage, genReadPosition, isCTRE, isREV,
 } from './motors.js';
+import { VERSION_PROFILE } from '../versions.js';
 
 export function genMechIOReal(type, m, N) {
     if (type === 'arm') {
@@ -213,17 +214,20 @@ export function genMechIOSim(type, m, N, attachedTo) {
         let setVolts = '';
 
         m.joints.forEach((j, i) => {
+            const lead = j.motors[0];
+            const motorKey = lead?.type?.toLowerCase() || 'neo';
+            const motorCount = j.motors.length;
+            const dcMotorExpr = VERSION_PROFILE.simApi.getMotorSim(motorKey, motorCount);
             fields += `    private final DCMotorSim joint${i}Sim = new DCMotorSim(
-        LinearSystemId.createDCMotorSystem(DCMotor.getNEO(1), 0.002, 10.0),
-        DCMotor.getNEO(1), 0.002, 0.01);
-    private final EncoderSim joint${i}EncoderSim = new EncoderSim(joint${i}Sim);
+        LinearSystemId.createDCMotorSystem(DCMotor.${dcMotorExpr.replace('DCMotor.', '')}, 0.002, ${(10 - i * 2).toFixed(1)}),
+        DCMotor.${dcMotorExpr.replace('DCMotor.', '')}, 0.002, 0.01);
     private double joint${i}AppliedVolts = 0.0;\n`;
 
             simUpdates += `
         joint${i}Sim.setInputVoltage(RoboRioSim.getVInVoltage() * joint${i}AppliedVolts / 12.0);
         joint${i}Sim.update(0.02);
-        inputs.positionRad[${i}] = joint${i}EncoderSim.getDistance();
-        inputs.velocityRadPerSec[${i}] = joint${i}EncoderSim.getRate();
+        inputs.positionRad[${i}] = joint${i}Sim.getAngularPositionRad();
+        inputs.velocityRadPerSec[${i}] = joint${i}Sim.getAngularVelocityRadPerSec();
         inputs.appliedVolts[${i}] = joint${i}AppliedVolts;
         inputs.currentAmps[${i}] = joint${i}Sim.getCurrentDrawAmps();\n`;
 
@@ -235,7 +239,6 @@ export function genMechIOSim(type, m, N, attachedTo) {
 import edu.wpi.first.math.system.plant.DCMotor;
 import edu.wpi.first.math.system.plant.LinearSystemId;
 import edu.wpi.first.wpilibj.simulation.DCMotorSim;
-import edu.wpi.first.wpilibj.simulation.EncoderSim;
 import edu.wpi.first.wpilibj.simulation.RoboRioSim;
 import frc.robot.Constants.ArmConstants;
 
@@ -313,16 +316,14 @@ ${setVolts}    }
 import edu.wpi.first.math.system.plant.DCMotor;
 import edu.wpi.first.math.system.plant.LinearSystemId;
 import edu.wpi.first.wpilibj.simulation.DCMotorSim;
-import edu.wpi.first.wpilibj.simulation.EncoderSim;
 import edu.wpi.first.wpilibj.simulation.RoboRioSim;
 import frc.robot.Constants.${N}Constants;
 
 public class ${N}IOSim implements ${N}IO {
     /** Simulation parent: ${attachedTo || 'chassis'} */
     private final DCMotorSim motorSim = new DCMotorSim(
-        LinearSystemId.createDCMotorSystem(DCMotor.getNEO(1), 0.002, 10.0),
-        DCMotor.getNEO(1), 0.002, 0.01);
-    private final EncoderSim encoderSim = new EncoderSim(motorSim);
+        LinearSystemId.createDCMotorSystem(${(() => { const motors = m.motors || []; const lead = motors[0]; const motorKey = lead?.type?.toLowerCase() || 'neo'; const motorCount = motors.length; return VERSION_PROFILE.simApi.getMotorSim(motorKey, motorCount); })()}, 0.002, 10.0),
+        ${(() => { const motors = m.motors || []; const lead = motors[0]; const motorKey = lead?.type?.toLowerCase() || 'neo'; const motorCount = motors.length; return VERSION_PROFILE.simApi.getMotorSim(motorKey, motorCount); })()}, 0.002, 0.01);
     private double appliedVolts = 0.0;${extraFields}
 
     public ${N}IOSim() {}
@@ -331,9 +332,10 @@ public class ${N}IOSim implements ${N}IO {
     public void updateInputs(${N}IOInputs inputs) {
         motorSim.setInputVoltage(RoboRioSim.getVInVoltage() * appliedVolts / 12.0);
         motorSim.update(0.02);
-        inputs.positionRad = encoderSim.getDistance();
-        inputs.velocityRadPerSec = encoderSim.getRate();
+        inputs.positionRad = motorSim.getAngularPositionRad();
+        inputs.velocityRadPerSec = motorSim.getAngularVelocityRadPerSec();
         inputs.appliedVolts = appliedVolts;
+        inputs.currentAmps = motorSim.getCurrentDrawAmps();
 ${type === 'elevator' ? '        inputs.heightMeters = inputs.positionRad / (2 * Math.PI) * ElevatorConstants.GEAR_RATIO;\n' : ''}${m.hasSensor ? '        inputs.hasPiece = false;\n' : ''}${extraUpdate}    }
 
     @Override

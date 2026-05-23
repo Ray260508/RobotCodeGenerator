@@ -3,6 +3,7 @@
  */
 import { MOTORS, GYROS, CHASSIS_TYPES, LIMELIGHT_VERSIONS } from './constants.js';
 import { validateConfig } from './validator.js';
+import { GEN_MODE } from './manifest.js';
 
 export function renderSummary(state) {
     const body = document.getElementById('summary-body');
@@ -173,6 +174,34 @@ export function renderSummary(state) {
             <br><br>
             <a href="javascript:void(0)" onclick="document.getElementById('sysid-btn').click()" style="color: var(--accent-cyan); text-decoration: underline;">Click here to view the SysId Guide</a>.
         </p>
+    </div>`;
+
+    // Generation mode selector
+    html += `<div class="summary-section" style="background: rgba(213,0,28,0.06); border: 1px solid rgba(213,0,28,0.25);">
+        <div class="summary-section-title" style="color: var(--accent-red)">⚙️ GENERATION MODE</div>
+        <div style="display:flex;flex-direction:column;gap:10px;padding:4px 0;">
+            <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
+                <input type="radio" name="gen-mode" value="full" checked style="margin-top:3px;accent-color:var(--accent-red);">
+                <div>
+                    <div style="font-size:0.85rem;font-weight:600;color:var(--text-primary)">Full Project</div>
+                    <div style="font-size:0.75rem;color:var(--text-secondary)">Generate the complete project from scratch. Use for first-time generation.</div>
+                </div>
+            </label>
+            <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
+                <input type="radio" name="gen-mode" value="add" style="margin-top:3px;accent-color:var(--accent-red);">
+                <div>
+                    <div style="font-size:0.85rem;font-weight:600;color:var(--text-primary)">Add Mechanism</div>
+                    <div style="font-size:0.75rem;color:var(--text-secondary)">Generate only new mechanism subsystem files + merge instructions. Use when adding to an existing project.</div>
+                </div>
+            </label>
+            <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
+                <input type="radio" name="gen-mode" value="libs" style="margin-top:3px;accent-color:var(--accent-red);">
+                <div>
+                    <div style="font-size:0.85rem;font-weight:600;color:var(--text-primary)">Update Libraries Only</div>
+                    <div style="font-size:0.75rem;color:var(--text-secondary)">Generate only build.gradle + vendordeps. Use to update library versions.</div>
+                </div>
+            </label>
+        </div>
     </div>`;
 
     html += `</div>`; // close review tab
