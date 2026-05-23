@@ -79,6 +79,20 @@
     margin-bottom: 8px;
 }
 
+.sysid-link-list {
+    margin-left: 20px;
+    margin-top: 12px;
+}
+
+.sysid-link-list li {
+    margin-bottom: 8px;
+}
+
+.sysid-link-list a {
+    color: var(--accent-gold);
+    text-decoration: underline;
+}
+
 .sysid-loading,
 .sysid-error {
     color: var(--text-secondary);

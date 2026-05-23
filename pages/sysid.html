@@ -1,36 +1,62 @@
 <h1 class="sysid-title">Tuning with WPILib SysId</h1>
-<p class="sysid-intro">Instead of guessing PID and Feedforward values, the generated code includes a <strong>SysIdRoutine</strong> for your configured mechanisms. This allows you to mathematically characterize your robot's physical properties (kV, kA, kS) and calculate optimal PID gains.</p>
+<p class="sysid-intro">Instead of guessing PID and Feedforward values, the generated code includes a <strong>SysIdRoutine</strong> for your configured mechanisms. This allows you to characterize real robot behavior and compute reliable <code>kS</code>, <code>kV</code>, <code>kA</code> and starter PID gains.</p>
 
 <div class="sysid-step">
-    <h2 class="sysid-step-title"><span class="sysid-step-badge">Step 1</span> Bind SysId Commands</h2>
-    <p>In your generated <code>RobotContainer.java</code>, bind the mechanism's SysId commands to your controller buttons. Make sure the robot has plenty of room to move.</p>
-    <pre class="sysid-code-block"><code>// Example: Binding Elevator SysId to D-Pad
-controller.povUp().whileTrue(elevator.sysIdQuasistatic(SysIdRoutine.Direction.kForward));
-controller.povDown().whileTrue(elevator.sysIdQuasistatic(SysIdRoutine.Direction.kReverse));
-controller.povRight().whileTrue(elevator.sysIdDynamic(SysIdRoutine.Direction.kForward));
-controller.povLeft().whileTrue(elevator.sysIdDynamic(SysIdRoutine.Direction.kReverse));</code></pre>
-</div>
-
-<div class="sysid-step">
-    <h2 class="sysid-step-title"><span class="sysid-step-badge">Step 2</span> Run the Characterization Tests</h2>
-    <p>Deploy the code and run the four tests in Autonomous or Teleop (depending on how you bound them). The data is automatically logged to a <code>.wpilog</code> file via WPILib DataLogManager or AdvantageKit.</p>
+    <h2 class="sysid-step-title"><span class="sysid-step-badge">Step 1</span> Prepare Hardware and Safety</h2>
     <ul class="sysid-list">
-        <li><strong>Quasistatic Forward/Reverse:</strong> Slowly ramps voltage to overcome static friction (<code>kS</code>) and measure velocity (<code>kV</code>). Let it run until the mechanism reaches its limit.</li>
-        <li><strong>Dynamic Forward/Reverse:</strong> Applies a sudden step voltage to measure acceleration (<code>kA</code>).</li>
+        <li><strong>WPILib baseline:</strong> Test one mechanism at a time, with enough free travel and clear field space.</li>
+        <li><strong>CTRE setup:</strong> Verify neutral mode, current limit, and inversion in Phoenix Tuner X before running tests.</li>
+        <li><strong>REV setup:</strong> Confirm idle mode, current limits, and sensor phase in REV Hardware Client first.</li>
+        <li><strong>6328-style logging:</strong> Ensure logging is stable (AdvantageKit/WPILib logs) before tuning so bad logs do not produce bad constants.</li>
     </ul>
 </div>
 
 <div class="sysid-step">
-    <h2 class="sysid-step-title"><span class="sysid-step-badge">Step 3</span> Analyze with SysId Tool</h2>
-    <p>Open the WPILib SysId tool from VS Code (<strong>WPILib: Start Tool -&gt; SysId</strong>). Load your recorded <code>.wpilog</code> file from the roboRIO or your computer.</p>
+    <h2 class="sysid-step-title"><span class="sysid-step-badge">Step 2</span> Bind and Run SysId Commands</h2>
+    <p>In your generated <code>RobotContainer.java</code>, bind the mechanism SysId commands to safe driver controls.</p>
+    <pre class="sysid-code-block"><code>// Example: Elevator SysId bindings
+controller.povUp().whileTrue(elevator.sysIdQuasistatic(SysIdRoutine.Direction.kForward));
+controller.povDown().whileTrue(elevator.sysIdQuasistatic(SysIdRoutine.Direction.kReverse));
+controller.povRight().whileTrue(elevator.sysIdDynamic(SysIdRoutine.Direction.kForward));
+controller.povLeft().whileTrue(elevator.sysIdDynamic(SysIdRoutine.Direction.kReverse));</code></pre>
+    <p>Run all four tests if possible:</p>
+    <ul class="sysid-list">
+        <li><strong>Quasistatic Fwd/Rev:</strong> voltage ramp for <code>kS</code> + <code>kV</code>.</li>
+        <li><strong>Dynamic Fwd/Rev:</strong> step input for <code>kA</code>.</li>
+    </ul>
+</div>
+
+<div class="sysid-step">
+    <h2 class="sysid-step-title"><span class="sysid-step-badge">Step 3</span> Analyze and Handle Common Situations</h2>
+    <p>Load the <code>.wpilog</code> into SysId from VS Code tools and inspect outliers before accepting gains.</p>
     <ol class="sysid-list-numbered">
-        <li>Select the mechanism type (e.g., Simple, Elevator, Arm).</li>
-        <li>Drag the logged signals (Voltage, Position, Velocity) into the analyzer UI.</li>
-        <li>Adjust the window size to filter out noise, and SysId will calculate your Feedforward and PID values.</li>
+        <li><strong>Arm/elevator gravity effects:</strong> if forward/reverse differ a lot, keep distinct expectations and verify gearing/friction.</li>
+        <li><strong>Shooter/flywheel:</strong> prioritize clean velocity traces; repeat tests if note slips or balls contact the wheel.</li>
+        <li><strong>Drive characterization:</strong> keep wheels on consistent carpet/tile during one data set; mixed surfaces skew results.</li>
+        <li><strong>Noisy data:</strong> reduce mechanical slop, check wiring, and rerun instead of forcing aggressive gains.</li>
     </ol>
 </div>
 
 <div class="sysid-step">
-    <h2 class="sysid-step-title"><span class="sysid-step-badge">Step 4</span> Apply the Constants</h2>
-    <p>Copy the generated <code>kP, kD, kS, kV, kA</code> values back into your generated <code>Constants.java</code>. The subsystem will automatically use these for tuned, smooth control.</p>
+    <h2 class="sysid-step-title"><span class="sysid-step-badge">Step 4</span> Apply Constants and Validate On-Robot</h2>
+    <p>Copy results into generated <code>Constants.java</code>, then validate with small command tests before full-speed operation.</p>
+    <ul class="sysid-list">
+        <li>Start with lower output limits and increase gradually.</li>
+        <li>Watch current draw and thermal behavior.</li>
+        <li>Retune after major hardware changes (motor swap, gear ratio change, mechanism rebuild).</li>
+    </ul>
+</div>
+
+<div class="sysid-step">
+    <h2 class="sysid-step-title"><span class="sysid-step-badge">Tools</span> Essential Downloads</h2>
+    <ul class="sysid-link-list">
+        <li><a href="https://docs.wpilib.org/en/stable/docs/zero-to-robot/introduction.html" target="_blank" rel="noopener">WPILib VS Code + FRC Tools</a></li>
+        <li><a href="https://docs.wpilib.org/en/stable/docs/software/advanced-controls/system-identification/index.html" target="_blank" rel="noopener">WPILib SysId Documentation</a></li>
+        <li><a href="https://github.com/Mechanical-Advantage/AdvantageKit" target="_blank" rel="noopener">AdvantageKit</a></li>
+        <li><a href="https://github.com/Mechanical-Advantage/AdvantageScope" target="_blank" rel="noopener">AdvantageScope</a></li>
+        <li><a href="https://v6.docs.ctr-electronics.com/" target="_blank" rel="noopener">CTRE Phoenix 6 / Tuner X</a></li>
+        <li><a href="https://docs.revrobotics.com/rev-hardware-client" target="_blank" rel="noopener">REV Hardware Client</a></li>
+        <li><a href="https://docs.advantagekit.org/" target="_blank" rel="noopener">AdvantageKit Docs</a></li>
+        <li><a href="https://github.com/Mechanical-Advantage/RobotCode2024Public" target="_blank" rel="noopener">Team 6328 Public Robot Code Reference</a></li>
+    </ul>
 </div>

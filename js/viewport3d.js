@@ -499,11 +499,11 @@ export function update3DModel(type, state) {
         const vis = state.vision || {};
         let file = 'ArduCam_M12Lens.glb';
         if (vis.system === 'limelight') {
-            const ver = vis.limelightVersion || 'limelight3';
-            if (ver === 'limelight3') file = 'LIMELIGHT3CAD_STEP.glb';
-            else if (ver === 'limelight3a') file = 'LIMELIGHT3ACAD_STEP.glb';
-            else if (ver === 'limelight3g') file = 'LIMELIGHT3GCAD_STEP.glb';
-            else if (ver === 'limelight4') file = 'LIMELIGHT4CAD_STEP.glb';
+            const ver = vis.limelightVersion || 'll3';
+            if (ver === 'll3') file = 'LIMELIGHT3CAD_STEP.glb';
+            else if (ver === 'll3a') file = 'LIMELIGHT3ACAD_STEP.glb';
+            else if (ver === 'll3g') file = 'LIMELIGHT3GCAD_STEP.glb';
+            else if (ver === 'll4') file = 'LIMELIGHT4CAD_STEP.glb';
         }
         const path = `assets/models/${file}`;
         loader.load(path, 
@@ -525,48 +525,50 @@ export function update3DModel(type, state) {
         );
     } else if (type === 'roller') {
         const rp = POSITIONS.roller;
-        const radius = 0.015;
-        const length = 0.45;
-        const gap = 0.035;
-        for (let i = 0; i < 8; i++) {
-            const pipe = new THREE.Mesh(
-                new THREE.CylinderGeometry(radius, radius, length, 12),
-                mat(COLORS.roller)
-            );
-            pipe.rotation.x = Math.PI / 2;
-            pipe.position.set(rp.x, rp.y, rp.z + (i - 3.5) * gap);
-            pipe.castShadow = true;
-            grp.add(pipe);
-        }
+        const plate = new THREE.Mesh(new THREE.BoxGeometry(0.82, 0.06, 0.72), mat(COLORS.roller));
+        plate.position.set(rp.x, rp.y, rp.z);
+        plate.castShadow = true;
+        grp.add(plate);
+        const edge = new THREE.Mesh(new THREE.BoxGeometry(0.84, 0.02, 0.74), mat(0x4e4e78, 0.7));
+        edge.position.set(rp.x, rp.y + 0.04, rp.z);
+        grp.add(edge);
     } else if (type === 'arm') {
         const armConfig = state.mechanisms?.arm || { dof: 2 };
         const dof = armConfig.dof || 2;
         const ap = POSITIONS.chassis;
-        
-        let prevPivot = new THREE.Vector3(ap.x, ap.y + 0.15, ap.z);
-        let linkGroup = grp;
+        const base = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.11, 0.08, 20), mat(0x333333));
+        base.position.set(ap.x, ap.y + 0.08, ap.z);
+        base.castShadow = true;
+        grp.add(base);
+
+        let chainRoot = new THREE.Group();
+        chainRoot.position.set(ap.x, ap.y + 0.12, ap.z);
+        grp.add(chainRoot);
 
         for (let i = 0; i < dof; i++) {
-            const length = 0.35 - i * 0.05;
-            const thickness = 0.08 - i * 0.02;
-            
-            const jointSubGrp = new THREE.Group();
-            jointSubGrp.position.copy(prevPivot);
-            linkGroup.add(jointSubGrp);
+            const length = Math.max(0.18, 0.34 - i * 0.04);
+            const thickness = Math.max(0.04, 0.075 - i * 0.01);
+            const segment = new THREE.Group();
+            chainRoot.add(segment);
 
-            const pivotSphere = new THREE.Mesh(new THREE.SphereGeometry(thickness * 0.7, 16, 16), mat(0x222222));
-            jointSubGrp.add(pivotSphere);
+            const joint = new THREE.Mesh(new THREE.SphereGeometry(thickness * 0.75, 16, 16), mat(0x262626));
+            segment.add(joint);
 
-            const linkMesh = new THREE.Mesh(new THREE.BoxGeometry(thickness, length, thickness), mat(COLORS.accent));
-            linkMesh.position.set(0, length / 2, 0);
-            linkMesh.castShadow = true;
-            jointSubGrp.add(linkMesh);
+            const link = new THREE.Mesh(new THREE.BoxGeometry(thickness, length, thickness), mat(COLORS.accent));
+            link.position.set(0, length / 2, 0);
+            link.castShadow = true;
+            segment.add(link);
 
-            const angle = -0.5 + i * 0.3;
-            jointSubGrp.rotation.z = angle;
+            const sidePlate = new THREE.Mesh(new THREE.BoxGeometry(thickness * 1.8, 0.02, thickness * 0.9), mat(0x884455, 0.7));
+            sidePlate.position.set(0, length * 0.68, 0);
+            segment.add(sidePlate);
 
-            prevPivot = new THREE.Vector3(0, length, 0);
-            linkGroup = jointSubGrp;
+            segment.rotation.z = -0.35 + i * 0.22;
+
+            const next = new THREE.Group();
+            next.position.set(0, length, 0);
+            segment.add(next);
+            chainRoot = next;
         }
     } else {
         if (type === 'intake') {

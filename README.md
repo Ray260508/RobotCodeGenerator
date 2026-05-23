@@ -27,9 +27,12 @@ A browser-based generator that helps FRC teams configure robot systems and downl
 - Launcher
 - Arm
 
-## Supported Systems (Non-Mechanism)
+## Vision Options
 
 - Vision
+
+## State Logic Options
+
 - StateMachine integration
 
 ## Known Limitations

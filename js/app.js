@@ -50,7 +50,10 @@ function bindLandingReveal() {
             const el = document.querySelector(id);
             if (!el || !lp) return;
             e.preventDefault();
-            const targetY = Math.max(0, el.offsetTop - 60);
+            const targetY = Math.max(
+                0,
+                el.getBoundingClientRect().top - lp.getBoundingClientRect().top + lp.scrollTop - 60
+            );
             lp.scrollTo({ top: targetY, left: 0, behavior: 'smooth' });
         });
     });

@@ -266,6 +266,28 @@
     min-height: 100vh;
     align-content: center;
     scroll-margin-top: 60px;
+    overflow: hidden;
+}
+
+.scroll-features::before {
+    content: '';
+    position: absolute;
+    inset: -20% -10%;
+    pointer-events: none;
+    background-image:
+        radial-gradient(circle, rgba(201, 169, 110, 0.7) 0 1px, transparent 2px),
+        radial-gradient(circle, rgba(120, 220, 255, 0.55) 0 1px, transparent 2px),
+        radial-gradient(circle, rgba(255, 255, 255, 0.45) 0 1px, transparent 2px);
+    background-size: 160px 220px, 210px 280px, 120px 180px;
+    background-position: 20% -10%, 60% -30%, 85% -20%;
+    animation: crystalFlow 11s linear infinite;
+    opacity: 0.35;
+    z-index: 0;
+}
+
+.scroll-features > * {
+    position: relative;
+    z-index: 1;
 }
 
 .feature-card {
@@ -287,6 +309,11 @@
     border-color: var(--border-accent);
     transform: translateY(-4px);
     box-shadow: var(--shadow-accent);
+}
+
+@keyframes crystalFlow {
+    from { transform: translateY(-8%); }
+    to { transform: translateY(12%); }
 }
 
 .feature-icon {
