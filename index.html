@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="FRC Robot Code Generator - Configure and generate production-ready FRC robot code with AdvantageKit architecture">
+    <meta name="description" content="FRC Robot Code Generator - Configure and generate production-ready FRC robot code with AdvantageKit-based architecture">
     <title>FRC Robot Code Generator | Engineered for Performance</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-  <script type="module" crossorigin src="./assets/index-XBo8I5vR.js"></script>
+  <script type="module" crossorigin src="./assets/index-DPBRlKPe.js"></script>
   <link rel="stylesheet" crossorigin href="./assets/index-DiqsltW6.css">
 </head>
 <body>
@@ -35,7 +35,7 @@
                 <span class="hero-line">ENGINEER</span>
                 <span class="hero-line accent">YOUR ROBOT</span>
             </h1>
-            <p class="hero-subtitle">Configure mechanisms, pick your framework, and download a deployable FRC project.</p>
+            <p class="hero-subtitle">Configure mechanisms, pick your code architecture, and download a deployable FRC project.</p>
             <div class="hero-actions">
                 <button id="btn-start" class="cta-button">
                     <span class="cta-text">CONFIGURE YOUR ROBOT</span>
@@ -96,9 +96,9 @@
                 </div>
             </div>
             <div class="architecture-frameworks">
-                <span class="arch-fw-label">Choose at generation:</span>
-                <span class="arch-fw-pill">AdvantageKit (default)</span>
-                <span class="arch-fw-pill">CommandBase (simple)</span>
+                <span class="arch-fw-label">Choose architecture at generation:</span>
+                <span class="arch-fw-pill">AdvantageKit-based (default)</span>
+                <span class="arch-fw-pill">Command-Based Template (simple)</span>
                 <span class="arch-fw-pill">+ StateMachine integration</span>
             </div>
         </section>
@@ -242,9 +242,9 @@
             </div>
             <div class="modal-footer">
                 <div class="framework-selector" id="framework-selector">
-                    <span class="fw-label">Framework:</span>
-                    <button class="fw-btn active" data-fw="advantagekit" title="AdvantageKit IO with data logging & replay">AdvantageKit</button>
-                    <button class="fw-btn" data-fw="commandbase" title="Standard WPILib CommandBase">CommandBase</button>
+                    <span class="fw-label">Architecture:</span>
+                    <button class="fw-btn active" data-fw="advantagekit" title="AdvantageKit-style IO with data logging and replay">AdvantageKit-based</button>
+                    <button class="fw-btn" data-fw="commandbase" title="Standard WPILib command-based template">Command-Based</button>
                 </div>
                 <label class="sm-integration-toggle" id="sm-integration-toggle" title="Generate state-driven subsystem commands when StateMachine JSON is configured">
                     <input type="checkbox" id="sm-integration-check">
