@@ -222,6 +222,12 @@ function genRobot(fw) {
 }
 
 function genConstants(s) {
+    const limelightNameMap = {
+        ll3: 'Limelight 3',
+        ll3a: 'Limelight 3A',
+        ll3g: 'Limelight 3G',
+        ll4: 'Limelight 4',
+    };
     let o = `package frc.robot;\n\npublic final class Constants {\n    private Constants() {}\n\n`;
     if (s.chassis.configured) {
         o += `    public static final class DriveConstants {\n`;
@@ -345,7 +351,7 @@ function genConstants(s) {
     if (s.vision.configured) {
         o += `    public static final class VisionConstants {\n`;
         o += `        public static final String SYSTEM = "${s.vision.system}";\n`;
-        if (s.vision.system === 'limelight') o += `        public static final String LIMELIGHT_VERSION = "${s.vision.limelightVersion}";\n`;
+        if (s.vision.system === 'limelight') o += `        public static final String LIMELIGHT_VERSION = "${limelightNameMap[s.vision.limelightVersion] || 'Limelight'}";\n`;
         o += `        public static final int CAMERA_COUNT = ${s.vision.cameraCount};\n`;
         s.vision.cameras.forEach((cam, i) => {
             o += `        // Camera ${i}: ${cam.name}\n`;
@@ -616,11 +622,17 @@ ${comments}
 function genVisionSubsystem(zip, pkg, s, fw) {
     const dir = `${pkg}/subsystems/vision`;
     const isLL = s.vision.system === 'limelight';
+    const limelightNameMap = {
+        ll3: 'Limelight 3',
+        ll3a: 'Limelight 3A',
+        ll3g: 'Limelight 3G',
+        ll4: 'Limelight 4',
+    };
     zip.file(`${dir}/VisionIO.java`, `package frc.robot.subsystems.vision;\nimport edu.wpi.first.math.geometry.Pose2d;\nimport org.littletonrobotics.junction.AutoLog;\npublic interface VisionIO {\n    @AutoLog class VisionIOInputs {\n        public boolean hasTarget = false;\n        public Pose2d estimatedPose = new Pose2d();\n        public double timestampSeconds = 0.0;\n        public int tagCount = 0;\n    }\n    default void updateInputs(VisionIOInputs inputs) {}\n}\n`);
     if (isLL) {
         let camInit = '';
         s.vision.cameras.forEach((c,i) => { camInit += `        // ${c.name}: Translation(${c.x}, ${c.y}, ${c.z}) Rotation(${c.roll}°, ${c.pitch}°, ${c.yaw}°)\n`; });
-        zip.file(`${dir}/VisionIOLimelight.java`, `package frc.robot.subsystems.vision;\nimport frc.robot.Constants.VisionConstants;\npublic class VisionIOLimelight implements VisionIO {\n    // Limelight version: ${s.vision.limelightVersion}\n${camInit}    public VisionIOLimelight() { /* Init cameras */ }\n    @Override public void updateInputs(VisionIOInputs inputs) { /* LimelightHelpers */ }\n}\n`);
+        zip.file(`${dir}/VisionIOLimelight.java`, `package frc.robot.subsystems.vision;\nimport frc.robot.Constants.VisionConstants;\npublic class VisionIOLimelight implements VisionIO {\n    // Limelight version: ${limelightNameMap[s.vision.limelightVersion] || 'Limelight'}\n${camInit}    public VisionIOLimelight() { /* Init cameras */ }\n    @Override public void updateInputs(VisionIOInputs inputs) { /* LimelightHelpers */ }\n}\n`);
     } else {
         let camInit = '';
         s.vision.cameras.forEach((c,i) => {
@@ -674,14 +686,24 @@ function genAutos(zip, pkg, state) {
 }
 
 function genReadme(s, name) {
+    const limelightNameMap = {
+        ll3: 'Limelight 3',
+        ll3a: 'Limelight 3A',
+        ll3g: 'Limelight 3G',
+        ll4: 'Limelight 4',
+    };
+    const visionDetail = s.vision.system === 'limelight'
+        ? (limelightNameMap[s.vision.limelightVersion] || 'Limelight')
+        : (s.vision.photonPlatform || 'PhotonVision');
+
     return `# FRC Robot Project: ${name}
 
 This deployable FRC codebase was automatically generated using the FRC Robot Code Generator.
 
-## 🛠️ Framework Overview
-- **Architecture**: ${s.framework === 'advantagekit' ? 'AdvantageKit (Telemetry-focused Multi-IO Layer)' : 'Command-Based Subsystem Template'}
+## 🛠️ Architecture Overview
+- **Code Architecture**: ${s.framework === 'advantagekit' ? 'AdvantageKit-based (Telemetry-focused multi-IO layer)' : 'WPILib command-based template'}
 - **Chassis**: ${s.chassis.configured ? `${s.chassis.type.toUpperCase()} drive (${s.chassis.tankCanIds ? 'Tank' : 'Swerve'})` : 'None'}
-- **Vision**: ${s.vision.configured ? `${s.vision.system} supporting ${s.vision.limelightVersion || s.vision.photonPlatform}` : 'None'}
+- **Vision**: ${s.vision.configured ? `${s.vision.system} supporting ${visionDetail}` : 'None'}
 
 ---
 

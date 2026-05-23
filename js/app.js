@@ -37,13 +37,11 @@ document.addEventListener('DOMContentLoaded', () => {
 function bindLandingReveal() {
     const lp = document.getElementById('landing-page');
     if (lp) {
-        lp.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+        lp.scrollTo({ top: 0, left: 0, behavior: 'auto' });
         setTimeout(() => {
-            lp.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+            lp.scrollTo({ top: 0, left: 0, behavior: 'auto' });
         }, 100);
     }
-
-    const easeInOutCubic = t => t < .5 ? 4 * t * t * t : (t - 1) * (2 * t - 2) * (2 * t - 2) + 1;
 
     document.querySelectorAll('.landing-nav .nav-link[href^="#"]').forEach(link => {
         link.addEventListener('click', (e) => {
@@ -52,21 +50,8 @@ function bindLandingReveal() {
             const el = document.querySelector(id);
             if (!el || !lp) return;
             e.preventDefault();
-            
-            const startY = lp.scrollTop;
-            const targetY = el.getBoundingClientRect().top + lp.scrollTop - 60; // 60 for nav height margin
-            const duration = 2500; // Slower scroll duration (ms)
-            const startTime = performance.now();
-
-            function step(currentTime) {
-                const elapsed = currentTime - startTime;
-                const progress = Math.min(elapsed / duration, 1);
-                lp.scrollTo(0, startY + (targetY - startY) * easeInOutCubic(progress));
-                if (progress < 1) {
-                    requestAnimationFrame(step);
-                }
-            }
-            requestAnimationFrame(step);
+            const targetY = Math.max(0, el.offsetTop - 60);
+            lp.scrollTo({ top: targetY, left: 0, behavior: 'smooth' });
         });
     });
 }
@@ -95,7 +80,7 @@ function showPage(page) {
     appState.setPage(page);
     if (page === 'landing') {
         const lp = document.getElementById('landing-page');
-        if (lp) lp.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+        if (lp) lp.scrollTo({ top: 0, left: 0, behavior: 'auto' });
     }
 }
 
@@ -330,9 +315,8 @@ async function loadSysIdPage() {
     if (!container || container.dataset.loaded === 'true') return;
     container.innerHTML = '<p class="sysid-loading">Loading SysId guide...</p>';
 
-    const relativePath = `${import.meta.env.BASE_URL}pages/sysid.html`;
-    const fallbackPath = './pages/sysid.html';
-    const candidates = [relativePath, fallbackPath];
+    const primaryPath = `${import.meta.env.BASE_URL}pages/sysid.html`;
+    const candidates = [primaryPath, './pages/sysid.html'];
 
     for (const path of candidates) {
         try {
@@ -379,6 +363,12 @@ const MNAMES = {
     talonfx_falcon: 'Falcon 500', talonfx_kraken60: 'Kraken X60', talonfx_kraken44: 'Kraken X44',
     talonfxs_minion: 'Minion', talonfxs: 'TalonFXS', sparkmax_neo: 'NEO', sparkmax_neo550: 'NEO 550', sparkflex_vortex: 'Vortex',
 };
+const LIMELIGHT_NAMES = {
+    ll3: 'Limelight 3',
+    ll3a: 'Limelight 3A',
+    ll3g: 'Limelight 3G',
+    ll4: 'Limelight 4',
+};
 
 function updateDescriptions(state) {
     const set = (sel, txt) => { const d = document.querySelector(sel); if (d) d.textContent = txt; };
@@ -395,6 +385,9 @@ function updateDescriptions(state) {
         const extra = motors.length > 1 ? ` +${motors.length - 1}` : '';
         set(`#card-${t} .card-desc`, `${name}${extra}`);
     });
-    if (state.vision.configured) set('#card-vision .card-desc', state.vision.system === 'limelight' ? `Limelight ${state.vision.limelightVersion}` : 'PhotonVision');
+    if (state.vision.configured) {
+        const llName = LIMELIGHT_NAMES[state.vision.limelightVersion] || 'Limelight';
+        set('#card-vision .card-desc', state.vision.system === 'limelight' ? llName : 'PhotonVision');
+    }
     if (state.statemachine.configured) set('#card-statemachine .card-desc', 'Enabled');
 }

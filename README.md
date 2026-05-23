@@ -1,6 +1,6 @@
 # FRC Robot Code Generator
 
-A browser-based generator that helps FRC teams configure robot mechanisms and download starter Java code projects.
+A browser-based generator that helps FRC teams configure robot systems and download starter Java code projects.
 
 ## Live Demo
 
@@ -8,14 +8,14 @@ A browser-based generator that helps FRC teams configure robot mechanisms and do
 
 ## What This Project Does
 
-- Lets you configure drivetrain + mechanisms in a UI.
+- Lets you configure drivetrain + robot systems in a UI.
 - Generates WPILib-style project code as a ZIP download.
 - Supports two code patterns for teams with different experience levels.
 
-## Supported Frameworks
+## Supported Code Architectures
 
-- AdvantageKit (default)
-- CommandBase
+- AdvantageKit-based architecture (default)
+- WPILib command-based template
 
 ## Supported Mechanisms
 
@@ -26,19 +26,11 @@ A browser-based generator that helps FRC teams configure robot mechanisms and do
 - Roller
 - Launcher
 - Arm
+
+## Supported Systems (Non-Mechanism)
+
 - Vision
 - StateMachine integration
-
-## Local Development Setup
-
-This project uses Vite with vanilla JavaScript ES modules.
-
-1. Install dependencies:
-   `npm install`
-2. Start the dev server:
-   `npm run dev`
-3. Build production output:
-   `npm run build`
 
 ## Known Limitations
 
@@ -48,4 +40,4 @@ This project uses Vite with vanilla JavaScript ES modules.
 
 ## Audience
 
-This repo is designed for FRC students, including teams new to web tooling. If you're new to npm or Vite, start with the Local Development Setup section and iterate from there.
+This repo is designed for FRC students, including teams new to web tooling.

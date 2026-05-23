@@ -1,0 +1,36 @@
+<h1 class="sysid-title">Tuning with WPILib SysId</h1>
+<p class="sysid-intro">Instead of guessing PID and Feedforward values, the generated code includes a <strong>SysIdRoutine</strong> for your configured mechanisms. This allows you to mathematically characterize your robot's physical properties (kV, kA, kS) and calculate optimal PID gains.</p>
+
+<div class="sysid-step">
+    <h2 class="sysid-step-title"><span class="sysid-step-badge">Step 1</span> Bind SysId Commands</h2>
+    <p>In your generated <code>RobotContainer.java</code>, bind the mechanism's SysId commands to your controller buttons. Make sure the robot has plenty of room to move.</p>
+    <pre class="sysid-code-block"><code>// Example: Binding Elevator SysId to D-Pad
+controller.povUp().whileTrue(elevator.sysIdQuasistatic(SysIdRoutine.Direction.kForward));
+controller.povDown().whileTrue(elevator.sysIdQuasistatic(SysIdRoutine.Direction.kReverse));
+controller.povRight().whileTrue(elevator.sysIdDynamic(SysIdRoutine.Direction.kForward));
+controller.povLeft().whileTrue(elevator.sysIdDynamic(SysIdRoutine.Direction.kReverse));</code></pre>
+</div>
+
+<div class="sysid-step">
+    <h2 class="sysid-step-title"><span class="sysid-step-badge">Step 2</span> Run the Characterization Tests</h2>
+    <p>Deploy the code and run the four tests in Autonomous or Teleop (depending on how you bound them). The data is automatically logged to a <code>.wpilog</code> file via WPILib DataLogManager or AdvantageKit.</p>
+    <ul class="sysid-list">
+        <li><strong>Quasistatic Forward/Reverse:</strong> Slowly ramps voltage to overcome static friction (<code>kS</code>) and measure velocity (<code>kV</code>). Let it run until the mechanism reaches its limit.</li>
+        <li><strong>Dynamic Forward/Reverse:</strong> Applies a sudden step voltage to measure acceleration (<code>kA</code>).</li>
+    </ul>
+</div>
+
+<div class="sysid-step">
+    <h2 class="sysid-step-title"><span class="sysid-step-badge">Step 3</span> Analyze with SysId Tool</h2>
+    <p>Open the WPILib SysId tool from VS Code (<strong>WPILib: Start Tool -&gt; SysId</strong>). Load your recorded <code>.wpilog</code> file from the roboRIO or your computer.</p>
+    <ol class="sysid-list-numbered">
+        <li>Select the mechanism type (e.g., Simple, Elevator, Arm).</li>
+        <li>Drag the logged signals (Voltage, Position, Velocity) into the analyzer UI.</li>
+        <li>Adjust the window size to filter out noise, and SysId will calculate your Feedforward and PID values.</li>
+    </ol>
+</div>
+
+<div class="sysid-step">
+    <h2 class="sysid-step-title"><span class="sysid-step-badge">Step 4</span> Apply the Constants</h2>
+    <p>Copy the generated <code>kP, kD, kS, kV, kA</code> values back into your generated <code>Constants.java</code>. The subsystem will automatically use these for tuned, smooth control.</p>
+</div>

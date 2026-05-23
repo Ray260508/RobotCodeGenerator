@@ -38,9 +38,9 @@ export function renderSummary(state) {
         html += `<div class="summary-alert summary-alert-ok"><strong>✓ All checks passed</strong></div>`;
     }
 
-    const fwLabel = state.framework === 'commandbase' ? 'CommandBase (simple)' : 'AdvantageKit (IO + replay)';
+    const fwLabel = state.framework === 'commandbase' ? 'Command-Based Template' : 'AdvantageKit-based Architecture (IO + replay)';
     html += `<div class="summary-section">
-        <div class="summary-section-title">CODE FRAMEWORK</div>
+        <div class="summary-section-title">CODE ARCHITECTURE</div>
         <div class="summary-grid">
             <div class="summary-item"><span class="summary-key">Pattern</span><span class="summary-val">${fwLabel}</span></div>
             <div class="summary-item"><span class="summary-key">StateMachine</span><span class="summary-val">${state.stateMachineIntegration ? 'State-driven commands' : 'Standard commands'}</span></div>
@@ -134,7 +134,7 @@ export function renderSummary(state) {
             html += `<div class="summary-section">
                 <div class="summary-section-title">VISION</div>
                 <div class="summary-grid">
-                    <div class="summary-item"><span class="summary-key">System</span><span class="summary-val">${state.vision.system==='limelight'?'Limelight '+state.vision.limelightVersion:'PhotonVision'}</span></div>
+                    <div class="summary-item"><span class="summary-key">System</span><span class="summary-val">${state.vision.system==='limelight'?(LIMELIGHT_VERSIONS[state.vision.limelightVersion]?.name || 'Limelight'):'PhotonVision'}</span></div>
                     ${state.vision.system==='photonvision'?`<div class="summary-item"><span class="summary-key">Platform</span><span class="summary-val">${state.vision.photonPlatform}</span></div>`:''}
                     <div class="summary-item"><span class="summary-key">Cameras</span><span class="summary-val">${state.vision.cameraCount}</span></div>
                 </div>`;
