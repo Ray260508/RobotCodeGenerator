@@ -2,17 +2,7 @@
 <p class="sysid-intro">Instead of guessing PID and Feedforward values, the generated code includes a <strong>SysIdRoutine</strong> for your configured mechanisms. This allows you to characterize real robot behavior and compute reliable <code>kS</code>, <code>kV</code>, <code>kA</code> and starter PID gains.</p>
 
 <div class="sysid-step">
-    <h2 class="sysid-step-title"><span class="sysid-step-badge">Step 1</span> Prepare Hardware and Safety</h2>
-    <ul class="sysid-list">
-        <li><strong>WPILib baseline:</strong> Test one mechanism at a time, with enough free travel and clear field space.</li>
-        <li><strong>CTRE setup:</strong> Verify neutral mode, current limit, and inversion in Phoenix Tuner X before running tests.</li>
-        <li><strong>REV setup:</strong> Confirm idle mode, current limits, and sensor phase in REV Hardware Client first.</li>
-        <li><strong>6328-style logging:</strong> Ensure logging is stable (AdvantageKit/WPILib logs) before tuning so bad logs do not produce bad constants.</li>
-    </ul>
-</div>
-
-<div class="sysid-step">
-    <h2 class="sysid-step-title"><span class="sysid-step-badge">Step 2</span> Bind and Run SysId Commands</h2>
+    <h2 class="sysid-step-title"><span class="sysid-step-badge">Step 1</span> Bind and Run SysId Commands</h2>
     <p>In your generated <code>RobotContainer.java</code>, bind the mechanism SysId commands to safe driver controls.</p>
     <pre class="sysid-code-block"><code>// Example: Elevator SysId bindings
 controller.povUp().whileTrue(elevator.sysIdQuasistatic(SysIdRoutine.Direction.kForward));
@@ -27,7 +17,7 @@ controller.povLeft().whileTrue(elevator.sysIdDynamic(SysIdRoutine.Direction.kRev
 </div>
 
 <div class="sysid-step">
-    <h2 class="sysid-step-title"><span class="sysid-step-badge">Step 3</span> Analyze and Handle Common Situations</h2>
+    <h2 class="sysid-step-title"><span class="sysid-step-badge">Step 2</span> Analyze and Handle Common Situations</h2>
     <p>Load the <code>.wpilog</code> into SysId from VS Code tools and inspect outliers before accepting gains.</p>
     <ol class="sysid-list-numbered">
         <li><strong>Arm/elevator gravity effects:</strong> if forward/reverse differ a lot, keep distinct expectations and verify gearing/friction.</li>
@@ -38,7 +28,7 @@ controller.povLeft().whileTrue(elevator.sysIdDynamic(SysIdRoutine.Direction.kRev
 </div>
 
 <div class="sysid-step">
-    <h2 class="sysid-step-title"><span class="sysid-step-badge">Step 4</span> Apply Constants and Validate On-Robot</h2>
+    <h2 class="sysid-step-title"><span class="sysid-step-badge">Step 3</span> Apply Constants and Validate On-Robot</h2>
     <p>Copy results into generated <code>Constants.java</code>, then validate with small command tests before full-speed operation.</p>
     <ul class="sysid-list">
         <li>Start with lower output limits and increase gradually.</li>
@@ -57,6 +47,5 @@ controller.povLeft().whileTrue(elevator.sysIdDynamic(SysIdRoutine.Direction.kRev
         <li><a href="https://v6.docs.ctr-electronics.com/" target="_blank" rel="noopener">CTRE Phoenix 6 / Tuner X</a></li>
         <li><a href="https://docs.revrobotics.com/rev-hardware-client" target="_blank" rel="noopener">REV Hardware Client</a></li>
         <li><a href="https://docs.advantagekit.org/" target="_blank" rel="noopener">AdvantageKit Docs</a></li>
-        <li><a href="https://github.com/Mechanical-Advantage/RobotCode2024Public" target="_blank" rel="noopener">Team 6328 Public Robot Code Reference</a></li>
     </ul>
 </div>

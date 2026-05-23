@@ -43,19 +43,24 @@ function bindLandingReveal() {
         }, 100);
     }
 
-    document.querySelectorAll('.landing-nav .nav-link[href^="#"]').forEach(link => {
-        link.addEventListener('click', (e) => {
-            const id = link.getAttribute('href');
-            if (!id || id === '#') return;
-            const el = document.querySelector(id);
-            if (!el || !lp) return;
-            e.preventDefault();
-            const targetY = Math.max(
-                0,
-                el.getBoundingClientRect().top - lp.getBoundingClientRect().top + lp.scrollTop - 60
-            );
+    const scrollToSection = (selector) => {
+        const el = document.querySelector(selector);
+        if (!el || !lp) return;
+        // Safari-safe: use scrollIntoView first, then force container alignment fallback.
+        el.scrollIntoView({ behavior: 'smooth', block: 'start', inline: 'nearest' });
+        setTimeout(() => {
+            const targetY = Math.max(0, el.offsetTop - 60);
             lp.scrollTo({ top: targetY, left: 0, behavior: 'smooth' });
-        });
+        }, 30);
+    };
+
+    document.getElementById('nav-features')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        scrollToSection('#features');
+    });
+    document.getElementById('nav-architecture')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        scrollToSection('#architecture');
     });
 }
 
