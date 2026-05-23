@@ -8,19 +8,10 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" defer></script>
-  <script type="module" crossorigin src="./assets/index-DBNd_gAj.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-Cb1-U0-t.css">
+  <script type="module" crossorigin src="./assets/index-XBo8I5vR.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-DiqsltW6.css">
 </head>
 <body>
-    <!-- Mobile Banner -->
-    <div id="mobile-banner" class="mobile-banner" style="display:none;">
-        <div class="mobile-banner-inner">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-            <span>Open on desktop for full access to code generation</span>
-        </div>
-    </div>
-
     <!-- Landing Page -->
     <section id="landing-page" class="page active">
         <canvas id="particle-canvas"></canvas>
@@ -34,7 +25,7 @@
                 <a href="#features" class="nav-link">Features</a>
                 <a href="#architecture" class="nav-link">Architecture</a>
                 <a href="https://ray260508.github.io/StateGraphGenerator/" target="_blank" class="nav-link">StateMachine</a>
-                <a href="#" id="nav-sysid" class="nav-link">SysId</a>
+                <button type="button" id="nav-sysid" class="nav-link nav-link-btn">SysId</button>
             </div>
         </nav>
 
@@ -118,12 +109,15 @@
     <section id="configurator-page" class="page">
         <!-- Top Bar -->
         <div class="config-topbar">
-            <button id="btn-back" class="topbar-btn">
+            <button id="btn-back" class="topbar-btn" aria-label="Back to landing page">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
             </button>
-            <div class="topbar-title" style="display: flex; align-items: center; gap: 12px;">
+            <div class="topbar-title-wrap">
+            <div class="topbar-title">
                 ROBOT CONFIGURATOR
-                <input type="text" id="project-name-input" placeholder="Project Name (e.g. FRC2026)" value="FRC2026_Robot" style="background: rgba(255,255,255,0.1); border: 1px solid var(--border-medium); color: var(--text-primary); padding: 4px 12px; border-radius: 4px; font-family: var(--font-mono); font-size: 0.85rem; width: 200px;">
+            </div>
+            <input type="text" id="project-name-input" placeholder="Project Name (e.g. FRC2026)" value="FRC2026_Robot" class="project-name-input">
+            <div class="config-saved-indicator" id="config-saved-indicator" aria-live="polite">Configuration saved</div>
             </div>
             <div class="topbar-status" id="config-status">0 / 8 configured</div>
         </div>
@@ -151,32 +145,32 @@
                     <div class="section-label">SUPERSTRUCTURE</div>
                     <div class="mechanism-cards-grid">
                         <div class="mechanism-card" data-type="elevator" id="card-elevator">
-                            <label class="card-toggle" title="Enable"><input type="checkbox" class="mech-toggle" data-mech="elevator"><span class="card-toggle-slider"></span></label>
+                            <label class="card-toggle" title="Enable"><input type="checkbox" class="mech-toggle" data-mech="elevator" aria-label="Enable elevator"><span class="card-toggle-slider"></span></label>
                             <div class="card-info"><div class="card-name">Elevator</div><div class="card-desc">Disabled</div></div>
                             <div class="card-status"></div>
                         </div>
                         <div class="mechanism-card" data-type="shooter" id="card-shooter">
-                            <label class="card-toggle" title="Enable"><input type="checkbox" class="mech-toggle" data-mech="shooter"><span class="card-toggle-slider"></span></label>
+                            <label class="card-toggle" title="Enable"><input type="checkbox" class="mech-toggle" data-mech="shooter" aria-label="Enable shooter"><span class="card-toggle-slider"></span></label>
                             <div class="card-info"><div class="card-name">Shooter</div><div class="card-desc">Disabled</div></div>
                             <div class="card-status"></div>
                         </div>
                         <div class="mechanism-card" data-type="intake" id="card-intake">
-                            <label class="card-toggle" title="Enable"><input type="checkbox" class="mech-toggle" data-mech="intake"><span class="card-toggle-slider"></span></label>
+                            <label class="card-toggle" title="Enable"><input type="checkbox" class="mech-toggle" data-mech="intake" aria-label="Enable intake"><span class="card-toggle-slider"></span></label>
                             <div class="card-info"><div class="card-name">Intake</div><div class="card-desc">Disabled</div></div>
                             <div class="card-status"></div>
                         </div>
                         <div class="mechanism-card" data-type="roller" id="card-roller">
-                            <label class="card-toggle" title="Enable"><input type="checkbox" class="mech-toggle" data-mech="roller"><span class="card-toggle-slider"></span></label>
+                            <label class="card-toggle" title="Enable"><input type="checkbox" class="mech-toggle" data-mech="roller" aria-label="Enable roller"><span class="card-toggle-slider"></span></label>
                             <div class="card-info"><div class="card-name">Roller</div><div class="card-desc">Disabled</div></div>
                             <div class="card-status"></div>
                         </div>
                         <div class="mechanism-card" data-type="launcher" id="card-launcher">
-                            <label class="card-toggle" title="Enable"><input type="checkbox" class="mech-toggle" data-mech="launcher"><span class="card-toggle-slider"></span></label>
+                            <label class="card-toggle" title="Enable"><input type="checkbox" class="mech-toggle" data-mech="launcher" aria-label="Enable launcher"><span class="card-toggle-slider"></span></label>
                             <div class="card-info"><div class="card-name">Launcher</div><div class="card-desc">Disabled</div></div>
                             <div class="card-status"></div>
                         </div>
                         <div class="mechanism-card" data-type="arm" id="card-arm">
-                            <label class="card-toggle" title="Enable"><input type="checkbox" class="mech-toggle" data-mech="arm"><span class="card-toggle-slider"></span></label>
+                            <label class="card-toggle" title="Enable"><input type="checkbox" class="mech-toggle" data-mech="arm" aria-label="Enable arm"><span class="card-toggle-slider"></span></label>
                             <div class="card-info"><div class="card-name">Arm</div><div class="card-desc">Disabled</div></div>
                             <div class="card-status"></div>
                         </div>
@@ -187,12 +181,12 @@
                 <div class="mechanism-section">
                     <div class="section-label">SYSTEMS</div>
                     <div class="mechanism-card" data-type="vision" id="card-vision">
-                        <label class="card-toggle" title="Enable"><input type="checkbox" class="mech-toggle" data-mech="vision"><span class="card-toggle-slider"></span></label>
+                        <label class="card-toggle" title="Enable"><input type="checkbox" class="mech-toggle" data-mech="vision" aria-label="Enable vision"><span class="card-toggle-slider"></span></label>
                         <div class="card-info"><div class="card-name">Vision</div><div class="card-desc">Disabled</div></div>
                         <div class="card-status"></div>
                     </div>
                     <div class="mechanism-card" data-type="statemachine" id="card-statemachine">
-                        <label class="card-toggle" title="Enable"><input type="checkbox" class="mech-toggle" data-mech="statemachine"><span class="card-toggle-slider"></span></label>
+                        <label class="card-toggle" title="Enable"><input type="checkbox" class="mech-toggle" data-mech="statemachine" aria-label="Enable statemachine"><span class="card-toggle-slider"></span></label>
                         <div class="card-info"><div class="card-name">StateMachine</div><div class="card-desc">Disabled</div></div>
                         <div class="card-status"></div>
                     </div>
@@ -210,7 +204,7 @@
             <div class="detail-sidebar" id="detail-sidebar">
                 <div class="sidebar-header">
                     <h2 class="sidebar-title" id="sidebar-title">Configure</h2>
-                    <button class="sidebar-close" id="sidebar-close">✕</button>
+                    <button class="sidebar-close" id="sidebar-close" aria-label="Close configuration sidebar">✕</button>
                 </div>
                 <div class="sidebar-content" id="sidebar-content">
                     <!-- Dynamic content injected by JS -->
@@ -228,7 +222,7 @@
             </div>
             <div class="bottom-actions">
                 <button class="btn-secondary" id="btn-reset">RESET ALL</button>
-                <button class="btn-primary" id="btn-generate">
+                <button class="btn-primary" id="btn-generate" aria-label="Generate robot code">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
                     GENERATE CODE
                 </button>
@@ -237,11 +231,11 @@
     </section>
 
     <!-- Configuration Summary Modal -->
-    <div class="modal-overlay" id="summary-overlay" style="display:none;">
+    <div class="modal-overlay" id="summary-overlay" role="dialog" aria-modal="true">
         <div class="modal-content modal-summary">
             <div class="modal-header">
                 <h2>Configuration Review</h2>
-                <button class="sidebar-close" id="summary-close">✕</button>
+                <button class="sidebar-close" id="summary-close" aria-label="Close configuration review">✕</button>
             </div>
             <div class="modal-body" id="summary-body">
                 <!-- Populated by JS -->
@@ -268,7 +262,7 @@
     </div>
 
     <!-- Generation Modal -->
-    <div class="modal-overlay" id="modal-overlay" style="display:none;">
+    <div class="modal-overlay" id="modal-overlay" role="dialog" aria-modal="true">
         <div class="modal-content" id="modal-content">
             <div class="modal-header">
                 <h2>Generating Robot Code</h2>
@@ -285,49 +279,12 @@
     <!-- SysId Guideline Page -->
     <section id="sysid-page" class="page">
         <div class="config-topbar">
-            <button id="sysid-back" class="topbar-btn">
+            <button id="sysid-back" class="topbar-btn" aria-label="Back to landing page">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
             </button>
             <div class="topbar-title">SYSTEM IDENTIFICATION GUIDELINE</div>
         </div>
-        <div class="sysid-content" style="max-width: 900px; margin: 40px auto; padding: 20px; color: var(--text-primary); line-height: 1.8; font-family: var(--font-body);">
-            <h1 style="color: var(--accent-red); margin-bottom: 20px; font-family: var(--font-display); font-size: 2.5rem;">Tuning with WPILib SysId</h1>
-            <p style="font-size: 1.1rem; color: var(--text-secondary);">Instead of guessing PID and Feedforward values, the generated code includes a <strong>SysIdRoutine</strong> for your configured mechanisms. This allows you to mathematically characterize your robot's physical properties (kV, kA, kS) and calculate optimal PID gains.</p>
-            
-            <div style="background: var(--bg-surface); padding: 24px; border-radius: 8px; border: 1px solid var(--border-medium); margin-top: 30px;">
-                <h2 style="color: var(--accent-gold); margin-bottom: 16px; display: flex; align-items: center; gap: 12px;"><span style="background: var(--accent-gold-dim); padding: 4px 12px; border-radius: 20px; font-size: 0.9rem;">Step 1</span> Bind SysId Commands</h2>
-                <p>In your generated <code>RobotContainer.java</code>, bind the mechanism's SysId commands to your controller buttons. Make sure the robot has plenty of room to move!</p>
-                <pre style="background: #111; padding: 16px; border-radius: 6px; overflow-x: auto; color: #ddd; font-family: var(--font-mono); font-size: 0.85rem; margin-top: 12px;"><code>// Example: Binding Elevator SysId to D-Pad
-controller.povUp().whileTrue(elevator.sysIdQuasistatic(SysIdRoutine.Direction.kForward));
-controller.povDown().whileTrue(elevator.sysIdQuasistatic(SysIdRoutine.Direction.kReverse));
-controller.povRight().whileTrue(elevator.sysIdDynamic(SysIdRoutine.Direction.kForward));
-controller.povLeft().whileTrue(elevator.sysIdDynamic(SysIdRoutine.Direction.kReverse));</code></pre>
-            </div>
-
-            <div style="background: var(--bg-surface); padding: 24px; border-radius: 8px; border: 1px solid var(--border-medium); margin-top: 24px;">
-                <h2 style="color: var(--accent-gold); margin-bottom: 16px; display: flex; align-items: center; gap: 12px;"><span style="background: var(--accent-gold-dim); padding: 4px 12px; border-radius: 20px; font-size: 0.9rem;">Step 2</span> Run the Characterization Tests</h2>
-                <p>Deploy the code and run the four tests in Autonomous or Teleop (depending on how you bound them). The data is automatically logged to a <code>.wpilog</code> file via WPILib DataLogManager or AdvantageKit.</p>
-                <ul style="margin-left: 20px; margin-top: 12px;">
-                    <li style="margin-bottom: 8px;"><strong>Quasistatic Forward/Reverse:</strong> Slowly ramps voltage to overcome static friction (<code>kS</code>) and measure velocity (<code>kV</code>). Let it run until the mechanism reaches its limit.</li>
-                    <li><strong>Dynamic Forward/Reverse:</strong> Applies a sudden step voltage to measure acceleration (<code>kA</code>).</li>
-                </ul>
-            </div>
-
-            <div style="background: var(--bg-surface); padding: 24px; border-radius: 8px; border: 1px solid var(--border-medium); margin-top: 24px;">
-                <h2 style="color: var(--accent-gold); margin-bottom: 16px; display: flex; align-items: center; gap: 12px;"><span style="background: var(--accent-gold-dim); padding: 4px 12px; border-radius: 20px; font-size: 0.9rem;">Step 3</span> Analyze with SysId Tool</h2>
-                <p>Open the WPILib SysId tool from VS Code (<strong>WPILib: Start Tool -> SysId</strong>). Load your recorded <code>.wpilog</code> file from the roboRIO or your computer.</p>
-                <ol style="margin-left: 24px; margin-top: 12px;">
-                    <li style="margin-bottom: 8px;">Select the mechanism type (e.g., Simple, Elevator, Arm).</li>
-                    <li style="margin-bottom: 8px;">Drag the logged signals (Voltage, Position, Velocity) into the analyzer UI.</li>
-                    <li>Adjust the window size to filter out noise, and SysId will calculate your Feedforward and PID values!</li>
-                </ol>
-            </div>
-
-            <div style="background: var(--bg-surface); padding: 24px; border-radius: 8px; border: 1px solid var(--border-medium); margin-top: 24px;">
-                <h2 style="color: var(--accent-gold); margin-bottom: 16px; display: flex; align-items: center; gap: 12px;"><span style="background: var(--accent-gold-dim); padding: 4px 12px; border-radius: 20px; font-size: 0.9rem;">Step 4</span> Apply the Constants</h2>
-                <p>Copy the generated <code>kP, kD, kS, kV, kA</code> values back into your generated <code>Constants.java</code>. The subsystem will automatically use these for perfectly tuned, smooth control.</p>
-            </div>
-        </div>
+        <div id="sysid-content-container" class="sysid-content"></div>
     </section>
 
 </body>
