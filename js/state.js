@@ -259,6 +259,11 @@ class StateManager {
 
     _isMechValid(type) {
         const m = this.state.mechanisms[type];
+        if (type === 'arm') {
+            if (!m?.enabled) return false;
+            if (!Array.isArray(m.joints) || m.joints.length < 1) return false;
+            return m.joints.every(j => Array.isArray(j.motors) && j.motors.length > 0 && !!j.motors[0]?.type);
+        }
         return !!(m.enabled && m.motors.length > 0 && m.motors[0].type);
     }
 

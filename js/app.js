@@ -326,7 +326,7 @@ function applyStateToUI(state) {
         const card = toggle.closest('.mechanism-card');
         if (!card) return;
         card.classList.toggle('enabled', enabled);
-        if (!enabled) card.querySelector('.card-desc').textContent = 'Disabled';
+        card.querySelector('.card-desc').textContent = enabled ? 'Click to configure' : 'Disabled';
         withViewport('setMechVisible')(mech, enabled);
     });
 
