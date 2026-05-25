@@ -3,7 +3,6 @@
  */
 import appState from './state.js';
 import { MOTORS, ENCODERS, GYROS, CHASSIS_TYPES, SWERVE_PRESETS, LIMELIGHT_VERSIONS, PHOTON_PLATFORMS, SENSOR_PORT_TYPES, DEFAULT_CAN_IDS } from './constants.js';
-import { updateShooterModel } from './viewport3d.js';
 import { getAllMechanisms } from './registry.js';
 
 function opts(obj, sel) {
@@ -343,7 +342,7 @@ function renderShooter(s, title, content) {
     
     bindRadio('shooterType', t => {
         appState.updateMechanism('shooter', { shooterType: t });
-        updateShooterModel(t);
+        document.dispatchEvent(new CustomEvent('rcg:update-shooter-model', { detail: { type: t } }));
         renderSidebar('shooter');
     });
 }

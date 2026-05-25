@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "description": "FRC Robot Code Generator with AdvantageKit architecture",
   "type": "module",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -10,7 +13,7 @@
   },
   "dependencies": {
     "jszip": "^3.10.1",
-    "three": "^0.170.0"
+    "three": "0.170.0"
   },
   "devDependencies": {
     "vite": "^6.3.0"

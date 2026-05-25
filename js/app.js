@@ -1,15 +1,29 @@
 /**
  * FRC Robot Code Generator — Main Application
  */
+import '../css/main.css';
 import appState from './state.js';
 import { renderSidebar, applySidebarConfig } from './sidebar.js';
-import { initParticles, showToast } from './renderer.js';
+import { createParticleController, showToast } from './renderer.js';
 import { generateProject } from './codegen.js';
 import { GEN_MODE } from './manifest.js';
-import { initViewport, zoomToMechanism, resetZoom as resetViewportZoom, updateMechConfigured, setMechVisible, update3DModel } from './viewport3d.js';
 import { renderSummary } from './summary.js';
+import { validateConfig } from './validator.js';
 
 const CONFIG_STORAGE_KEY = 'robotConfig';
+let particleController;
+let viewportApi = null;
+
+async function loadViewportModule() {
+    if (viewportApi) return viewportApi;
+    viewportApi = await import('./viewport3d.js');
+    return viewportApi;
+}
+
+function withViewport(fn) {
+    if (!viewportApi || typeof viewportApi[fn] !== 'function') return () => {};
+    return viewportApi[fn];
+}
 
 document.addEventListener('DOMContentLoaded', () => {
     const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) || window.innerWidth < 768;
@@ -17,7 +31,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (isMobile) document.body.classList.add('is-mobile');
 
     restoreSavedState();
-    initParticles();
+    particleController = createParticleController();
+    particleController.start();
     bindNavigation();
     bindLandingReveal();
     bindConfigurator();
@@ -31,6 +46,22 @@ document.addEventListener('DOMContentLoaded', () => {
         updateProgressBar();
         updateCardStates(state);
         syncViewport(state);
+    });
+
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+            particleController?.stop();
+            withViewport('setRenderPaused')(true);
+            return;
+        }
+        if (appState.getState().currentPage === 'landing') particleController?.start();
+        withViewport('setRenderPaused')(false);
+    });
+
+    document.addEventListener('rcg:update-shooter-model', (event) => {
+        const shooterType = event.detail?.type;
+        if (!shooterType) return;
+        withViewport('updateShooterModel')(shooterType);
     });
 });
 
@@ -72,11 +103,11 @@ function bindNavigation() {
     });
     document.getElementById('sysid-back')?.addEventListener('click', () => showPage('landing'));
 
-    document.getElementById('btn-start')?.addEventListener('click', () => {
+    document.getElementById('btn-start')?.addEventListener('click', async () => {
         showPage('configurator');
+        particleController?.stop();
         setTimeout(() => {
-            const container = document.getElementById('viewport-3d-container');
-            if (container) initViewport(container);
+            initViewportSafely();
         }, 100);
     });
     document.getElementById('btn-back')?.addEventListener('click', () => showPage('landing'));
@@ -89,6 +120,11 @@ function showPage(page) {
     if (page === 'landing') {
         const lp = document.getElementById('landing-page');
         if (lp) lp.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+        particleController?.start();
+        withViewport('dispose')();
+        viewportApi = null;
+    } else if (page === 'configurator') {
+        particleController?.stop();
     }
 }
 
@@ -113,10 +149,11 @@ function bindConfigurator() {
     });
     document.getElementById('btn-reset')?.addEventListener('click', () => {
         appState.resetAll();
+        localStorage.removeItem(CONFIG_STORAGE_KEY);
         closeSidebar();
         document.querySelectorAll('.mech-toggle').forEach(t => { t.checked = false; });
         document.querySelectorAll('.mechanism-card').forEach(c => c.classList.remove('enabled', 'configured'));
-        ['elevator', 'shooter', 'intake', 'roller', 'launcher', 'arm', 'vision'].forEach(m => setMechVisible(m, false));
+        ['elevator', 'shooter', 'intake', 'roller', 'launcher', 'arm', 'vision'].forEach(m => withViewport('setMechVisible')(m, false));
         showToast('Configuration reset', 'info');
     });
 }
@@ -142,7 +179,7 @@ function bindToggles() {
             else if (mech === 'statemachine') appState.updateStateMachine({ enabled });
             else if (appState.getState().mechanisms[mech]) appState.updateMechanism(mech, { enabled });
 
-            setMechVisible(mech, enabled);
+            withViewport('setMechVisible')(mech, enabled);
         });
     });
 }
@@ -153,14 +190,14 @@ function selectMechanism(type) {
     appState.selectMechanism(type);
     renderSidebar(type);
     document.getElementById('detail-sidebar')?.classList.add('open');
-    zoomToMechanism(type);
+    withViewport('zoomToMechanism')(type);
 }
 
 function closeSidebar() {
     document.getElementById('detail-sidebar')?.classList.remove('open');
     document.querySelectorAll('.mechanism-card').forEach(c => c.classList.remove('selected'));
     appState.closeSidebar();
-    resetViewportZoom();
+    withViewport('resetZoom')();
 }
 
 function bindSidebar() {
@@ -170,7 +207,7 @@ function bindSidebar() {
         if (!type) return;
         applySidebarConfig(type);
         const state = appState.getState();
-        update3DModel(type, state);
+        withViewport('update3DModel')(type, state);
         let ok = false;
         if (type === 'chassis') ok = state.chassis.configured;
         else if (type === 'vision') ok = state.vision.configured;
@@ -193,6 +230,13 @@ function bindGeneration() {
     document.getElementById('btn-generate')?.addEventListener('click', () => {
         const state = appState.getState();
         if (!state.chassis.configured) { showToast('Configure chassis first', 'error'); return; }
+        const { errors } = validateConfig(state);
+        if (errors.length > 0) {
+            renderSummary(state);
+            summaryOverlay.style.display = 'flex';
+            showToast('Fix validation errors before generating', 'error');
+            return;
+        }
         renderSummary(state);
         summaryOverlay.style.display = 'flex';
 
@@ -283,7 +327,7 @@ function applyStateToUI(state) {
         if (!card) return;
         card.classList.toggle('enabled', enabled);
         if (!enabled) card.querySelector('.card-desc').textContent = 'Disabled';
-        setMechVisible(mech, enabled);
+        withViewport('setMechVisible')(mech, enabled);
     });
 
     updateDescriptions(state);
@@ -362,9 +406,27 @@ function updateCardStates(state) {
 }
 
 function syncViewport(state) {
-    updateMechConfigured('chassis', state.chassis.configured);
-    Object.entries(state.mechanisms).forEach(([t, m]) => updateMechConfigured(t, m.configured));
-    updateMechConfigured('vision', state.vision.configured);
+    withViewport('updateMechConfigured')('chassis', state.chassis.configured);
+    Object.entries(state.mechanisms).forEach(([t, m]) => withViewport('updateMechConfigured')(t, m.configured));
+    withViewport('updateMechConfigured')('vision', state.vision.configured);
+}
+
+async function initViewportSafely() {
+    const container = document.getElementById('viewport-3d-container');
+    const hint = document.getElementById('viewport-hint');
+    if (!container) return;
+    if (hint) hint.textContent = 'Loading 3D preview...';
+
+    try {
+        const vp = await loadViewportModule();
+        vp.initViewport(container);
+        applyStateToUI(appState.getState());
+        syncViewport(appState.getState());
+        if (hint) hint.textContent = 'Click a mechanism · Drag to orbit · Scroll to zoom';
+    } catch (err) {
+        container.innerHTML = '<p class="viewport-error">3D preview unavailable. Configure mechanisms from the panel.</p>';
+        if (hint) hint.textContent = '3D preview unavailable';
+    }
 }
 
 const MNAMES = {

@@ -5,6 +5,7 @@ A browser-based generator that helps FRC teams configure robot systems and downl
 ## Live Demo
 
 - [Open the live demo](https://ray260508.github.io/RobotCodeGenerator/)
+- GitHub Pages deploy uses the project base path `/RobotCodeGenerator/`.
 
 ## What This Project Does
 

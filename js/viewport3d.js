@@ -1,5 +1,28 @@
 /** 3D Robot Viewport — placeholder meshes, orbit controls */
-import * as THREE from 'three';
+import {
+    ACESFilmicToneMapping,
+    AmbientLight,
+    BoxGeometry,
+    Color,
+    CylinderGeometry,
+    DirectionalLight,
+    EdgesGeometry,
+    FogExp2,
+    GridHelper,
+    Group,
+    LineBasicMaterial,
+    LineSegments,
+    Mesh,
+    MeshStandardMaterial,
+    PCFSoftShadowMap,
+    PerspectiveCamera,
+    PlaneGeometry,
+    Scene,
+    SphereGeometry,
+    SpotLight,
+    Vector3,
+    WebGLRenderer,
+} from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
@@ -28,27 +51,35 @@ let animationId;
 let currentZoomTarget = null;
 let isInitialized = false;
 let isVisible = true;
+let isPaused = false;
+let viewportContainer = null;
 
 export function initViewport(container) {
     if (isInitialized) return;
     isInitialized = true;
+    viewportContainer = container;
 
-    scene = new THREE.Scene();
+    scene = new Scene();
     // Subtle dark blue-gray gradient — NOT pure black
-    scene.background = new THREE.Color(0x16181e);
-    scene.fog = new THREE.FogExp2(0x16181e, 0.06);
+    scene.background = new Color(0x16181e);
+    scene.fog = new FogExp2(0x16181e, 0.06);
 
-    camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 100);
+    camera = new PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 100);
     camera.position.set(2.24, 1.92, 3.2);
 
-    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer = new WebGLRenderer({ antialias: true });
     renderer.setSize(container.clientWidth, container.clientHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.shadowMap.type = PCFSoftShadowMap;
+    renderer.toneMapping = ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.6;
     container.appendChild(renderer.domElement);
+    renderer.domElement.addEventListener('webglcontextlost', (event) => {
+        event.preventDefault();
+        dispose();
+        showViewportFallback('3D preview unavailable. Configure mechanisms from the panel.');
+    });
 
     controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
@@ -59,44 +90,44 @@ export function initViewport(container) {
     controls.maxPolarAngle = Math.PI * 0.85;
 
     // --- Lighting: bright center, soft edges ---
-    scene.add(new THREE.AmbientLight(0x8899bb, 0.8));
+    scene.add(new AmbientLight(0x8899bb, 0.8));
 
-    const key = new THREE.DirectionalLight(0xffffff, 2.0);
+    const key = new DirectionalLight(0xffffff, 2.0);
     key.position.set(4, 8, 4);
     key.castShadow = true;
     key.shadow.mapSize.set(1024, 1024);
     scene.add(key);
 
-    const fill = new THREE.DirectionalLight(0x6688cc, 0.7);
+    const fill = new DirectionalLight(0x6688cc, 0.7);
     fill.position.set(-5, 4, 6);
     scene.add(fill);
 
-    const rim = new THREE.DirectionalLight(0xD5001C, 0.3);
+    const rim = new DirectionalLight(0xD5001C, 0.3);
     rim.position.set(-3, 2, -4);
     scene.add(rim);
 
     // Spotlight on center for bright focus
-    const spot = new THREE.SpotLight(0xffffff, 1.5, 15, Math.PI / 6, 0.5);
+    const spot = new SpotLight(0xffffff, 1.5, 15, Math.PI / 6, 0.5);
     spot.position.set(0, 8, 0);
     spot.target.position.set(0, 0.5, 0);
     scene.add(spot);
     scene.add(spot.target);
 
     // Ground — dark reflective floor
-    const ground = new THREE.Mesh(
-        new THREE.PlaneGeometry(20, 20),
-        new THREE.MeshStandardMaterial({ color: 0x1a1c24, roughness: 0.7, metalness: 0.3 })
+    const ground = new Mesh(
+        new PlaneGeometry(20, 20),
+        new MeshStandardMaterial({ color: 0x1a1c24, roughness: 0.7, metalness: 0.3 })
     );
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
     scene.add(ground);
 
     // Grid — subtle
-    const grid = new THREE.GridHelper(10, 20, 0x2a2c34, 0x1e2028);
+    const grid = new GridHelper(10, 20, 0x2a2c34, 0x1e2028);
     grid.position.y = 0.001;
     scene.add(grid);
 
-    robotGroup = new THREE.Group();
+    robotGroup = new Group();
     scene.add(robotGroup);
 
     buildPlaceholderRobot();
@@ -114,7 +145,7 @@ export function initViewport(container) {
     window.addEventListener('resize', onResize);
 
     function animate() {
-        if (!isVisible) {
+        if (!isVisible || isPaused) {
             animationId = requestAnimationFrame(animate);
             return;
         }
@@ -133,8 +164,13 @@ export function initViewport(container) {
     observer.observe(container);
 }
 
+function showViewportFallback(message) {
+    if (!viewportContainer) return;
+    viewportContainer.innerHTML = `<p class="viewport-error">${message}</p>`;
+}
+
 function mat(color, opacity = 1) {
-    return new THREE.MeshStandardMaterial({
+    return new MeshStandardMaterial({
         color, roughness: 0.35, metalness: 0.5,
         transparent: opacity < 1, opacity
     });
@@ -142,21 +178,21 @@ function mat(color, opacity = 1) {
 
 function buildPlaceholderRobot() {
     // === CHASSIS ===
-    const chassisGrp = new THREE.Group();
-    const body = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.1, 0.75), mat(COLORS.chassis));
+    const chassisGrp = new Group();
+    const body = new Mesh(new BoxGeometry(0.85, 0.1, 0.75), mat(COLORS.chassis));
     body.position.y = POSITIONS.chassis.y;
     body.castShadow = true;
     chassisGrp.add(body);
 
-    const wGeo = new THREE.CylinderGeometry(0.06, 0.06, 0.04, 16);
+    const wGeo = new CylinderGeometry(0.06, 0.06, 0.04, 16);
     const wMat = mat(COLORS.wheel);
     [[-0.38, -0.33], [-0.38, 0.33], [0.38, -0.33], [0.38, 0.33]].forEach(([x, z]) => {
-        const w = new THREE.Mesh(wGeo, wMat);
+        const w = new Mesh(wGeo, wMat);
         w.rotation.x = Math.PI / 2;
         w.position.set(x, 0.06, z);
         w.castShadow = true;
         chassisGrp.add(w);
-        const h = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.08, 0.1), mat(COLORS.chassis, 0.7));
+        const h = new Mesh(new BoxGeometry(0.1, 0.08, 0.1), mat(COLORS.chassis, 0.7));
         h.position.set(x, 0.14, z);
         chassisGrp.add(h);
     });
@@ -164,14 +200,14 @@ function buildPlaceholderRobot() {
     robotGroup.add(chassisGrp);
 
     // === ELEVATOR ===
-    const elevGrp = new THREE.Group();
+    const elevGrp = new Group();
     const ep = POSITIONS.elevator;
-    const rail = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.9, 0.08), mat(COLORS.elevator));
+    const rail = new Mesh(new BoxGeometry(0.08, 0.9, 0.08), mat(COLORS.elevator));
     rail.position.set(ep.x - 0.08, ep.y, ep.z);
     rail.castShadow = true;
     elevGrp.add(rail);
     const rail2 = rail.clone(); rail2.position.x = ep.x + 0.08; elevGrp.add(rail2);
-    const carriage = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.06, 0.1), mat(COLORS.elevator, 0.8));
+    const carriage = new Mesh(new BoxGeometry(0.22, 0.06, 0.1), mat(COLORS.elevator, 0.8));
     carriage.position.set(ep.x, ep.y + 0.2, ep.z);
     elevGrp.add(carriage);
     addEdges(elevGrp, rail);
@@ -179,20 +215,20 @@ function buildPlaceholderRobot() {
     robotGroup.add(elevGrp);
 
     // === SHOOTER (Initial Placeholder) ===
-    const shootGrp = new THREE.Group();
+    const shootGrp = new Group();
     buildShooterPlaceholder('adjustable', shootGrp);
     mechGroups.shooter = shootGrp;
     robotGroup.add(shootGrp);
 
     // === INTAKE ===
-    const intGrp = new THREE.Group();
+    const intGrp = new Group();
     const ip = POSITIONS.intake;
-    const intBody = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.12, 0.5), mat(COLORS.intake));
+    const intBody = new Mesh(new BoxGeometry(0.3, 0.12, 0.5), mat(COLORS.intake));
     intBody.position.set(ip.x, ip.y, ip.z);
     intBody.rotation.z = -0.25;
     intBody.castShadow = true;
     intGrp.add(intBody);
-    const intRoller = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.45, 12), mat(0x339933));
+    const intRoller = new Mesh(new CylinderGeometry(0.03, 0.03, 0.45, 12), mat(0x339933));
     intRoller.rotation.x = Math.PI / 2;
     intRoller.position.set(ip.x - 0.12, ip.y - 0.02, ip.z);
     intGrp.add(intRoller);
@@ -200,42 +236,42 @@ function buildPlaceholderRobot() {
     robotGroup.add(intGrp);
 
     // === ROLLER ===
-    const rolGrp = new THREE.Group();
+    const rolGrp = new Group();
     mechGroups.roller = rolGrp;
     robotGroup.add(rolGrp);
     // Draw default roller fallback
     update3DModel('roller', { mechanisms: { roller: { configured: true } } });
 
     // === LAUNCHER ===
-    const grabGrp = new THREE.Group();
+    const grabGrp = new Group();
     const gp = POSITIONS.launcher;
     [-0.09, 0.09].forEach(dz => {
-        const f = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.18, 0.04), mat(COLORS.launcher));
+        const f = new Mesh(new BoxGeometry(0.03, 0.18, 0.04), mat(COLORS.launcher));
         f.position.set(gp.x, gp.y, gp.z + dz);
         f.castShadow = true;
         grabGrp.add(f);
     });
-    const gBase = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.04, 0.22), mat(COLORS.launcher));
+    const gBase = new Mesh(new BoxGeometry(0.08, 0.04, 0.22), mat(COLORS.launcher));
     gBase.position.set(gp.x, gp.y - 0.1, gp.z);
     grabGrp.add(gBase);
     mechGroups.launcher = grabGrp;
     robotGroup.add(grabGrp);
 
     // === ARM ===
-    const armGrp = new THREE.Group();
+    const armGrp = new Group();
     mechGroups.arm = armGrp;
     robotGroup.add(armGrp);
     // Draw default arm fallback
     update3DModel('arm', { mechanisms: { arm: { configured: true, dof: 2 } } });
 
     // === VISION ===
-    const visGrp = new THREE.Group();
+    const visGrp = new Group();
     const vp = POSITIONS.vision;
-    const cam = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.06, 0.06), mat(COLORS.vision));
+    const cam = new Mesh(new BoxGeometry(0.08, 0.06, 0.06), mat(COLORS.vision));
     cam.position.set(vp.x, vp.y, vp.z);
     cam.castShadow = true;
     visGrp.add(cam);
-    const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.02, 0.03, 8), mat(0x222222));
+    const lens = new Mesh(new CylinderGeometry(0.015, 0.02, 0.03, 8), mat(0x222222));
     lens.rotation.z = Math.PI / 2;
     lens.position.set(vp.x + 0.05, vp.y, vp.z);
     visGrp.add(lens);
@@ -244,9 +280,9 @@ function buildPlaceholderRobot() {
 }
 
 function addEdges(group, mesh) {
-    const edges = new THREE.LineSegments(
-        new THREE.EdgesGeometry(mesh.geometry),
-        new THREE.LineBasicMaterial({ color: 0x99aabb, transparent: true, opacity: 0.3 })
+    const edges = new LineSegments(
+        new EdgesGeometry(mesh.geometry),
+        new LineBasicMaterial({ color: 0x99aabb, transparent: true, opacity: 0.3 })
     );
     edges.position.copy(mesh.position);
     group.add(edges);
@@ -283,10 +319,10 @@ export function zoomToMechanism(type) {
     let finalTarget = z.target;
     
     if (isOpen) {
-        const pVec = new THREE.Vector3(...z.pos);
-        const tVec = new THREE.Vector3(...z.target);
-        const dir = new THREE.Vector3().subVectors(tVec, pVec).normalize();
-        const right = new THREE.Vector3().crossVectors(dir, new THREE.Vector3(0, 1, 0)).normalize();
+        const pVec = new Vector3(...z.pos);
+        const tVec = new Vector3(...z.target);
+        const dir = new Vector3().subVectors(tVec, pVec).normalize();
+        const right = new Vector3().crossVectors(dir, new Vector3(0, 1, 0)).normalize();
         
         // Shift by 0.5 units to the right
         pVec.addScaledVector(right, 0.5);
@@ -306,10 +342,10 @@ export function zoomToMechanism(type) {
                 c.material.opacity = k === type ? 1.0 : 0.2;
                 c.material.transparent = true;
                 if (k === type) {
-                    c.material.emissive = new THREE.Color(COLORS.accent);
+                    c.material.emissive = new Color(COLORS.accent);
                     c.material.emissiveIntensity = 0.12;
                 } else {
-                    c.material.emissive = new THREE.Color(0);
+                    c.material.emissive = new Color(0);
                     c.material.emissiveIntensity = 0;
                 }
                 c.material.needsUpdate = true;
@@ -326,7 +362,7 @@ export function resetZoom() {
         grp.traverse(c => {
             if (c.isMesh && c.material) {
                 c.material.opacity = 1.0;
-                c.material.emissive = new THREE.Color(0);
+                c.material.emissive = new Color(0);
                 c.material.emissiveIntensity = 0;
                 c.material.needsUpdate = true;
             }
@@ -336,7 +372,7 @@ export function resetZoom() {
 
 function animateCameraTo(pos, target) {
     const sP = camera.position.clone(), sT = controls.target.clone();
-    const eP = new THREE.Vector3(...pos), eT = new THREE.Vector3(...target);
+    const eP = new Vector3(...pos), eT = new Vector3(...target);
     const dur = 800, start = performance.now();
     function step(now) {
         const t = Math.min((now - start) / dur, 1);
@@ -355,10 +391,10 @@ export function updateMechConfigured(type, configured) {
     grp.traverse(c => {
         if (c.isMesh && c.material) {
             if (configured) {
-                c.material.emissive = new THREE.Color(0x22aa44);
+                c.material.emissive = new Color(0x22aa44);
                 c.material.emissiveIntensity = 0.08;
             } else {
-                c.material.emissive = new THREE.Color(0);
+                c.material.emissive = new Color(0);
                 c.material.emissiveIntensity = 0;
             }
             c.material.needsUpdate = true;
@@ -390,36 +426,53 @@ function clearGroup(group) {
 
 export function dispose() {
     if (animationId) cancelAnimationFrame(animationId);
+    animationId = null;
     renderer?.dispose();
+    if (viewportContainer) viewportContainer.innerHTML = '';
+    scene = null;
+    camera = null;
+    renderer = null;
+    controls = null;
+    robotGroup = null;
+    mechGroups = {};
+    currentZoomTarget = null;
+    isInitialized = false;
+    isVisible = true;
+    isPaused = false;
+    viewportContainer = null;
+}
+
+export function setRenderPaused(paused) {
+    isPaused = !!paused;
 }
 
 export function buildShooterPlaceholder(type, group) {
     clearGroup(group);
     const sp = POSITIONS.shooter;
-    const matShooter = new THREE.MeshStandardMaterial({ color: COLORS.shooter, roughness: 0.6 });
+    const matShooter = new MeshStandardMaterial({ color: COLORS.shooter, roughness: 0.6 });
     if (type === 'adjustable_turret') {
-        const turretBase = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.05, 32), new THREE.MeshStandardMaterial({ color: 0x444455 }));
+        const turretBase = new Mesh(new CylinderGeometry(0.15, 0.15, 0.05, 32), new MeshStandardMaterial({ color: 0x444455 }));
         turretBase.position.set(sp.x, sp.y - 0.05, sp.z);
         turretBase.castShadow = true;
         group.add(turretBase);
         
-        const sFrame = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.15, 0.25), new THREE.MeshStandardMaterial({ color: COLORS.shooter, transparent: true, opacity: 0.6 }));
+        const sFrame = new Mesh(new BoxGeometry(0.1, 0.15, 0.25), new MeshStandardMaterial({ color: COLORS.shooter, transparent: true, opacity: 0.6 }));
         sFrame.position.set(sp.x, sp.y + 0.05, sp.z);
         group.add(sFrame);
         
-        const flywheel = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.06, 20), matShooter);
+        const flywheel = new Mesh(new CylinderGeometry(0.08, 0.08, 0.06, 20), matShooter);
         flywheel.position.set(sp.x + 0.05, sp.y + 0.1, sp.z + 0.06);
         flywheel.rotation.x = Math.PI / 2;
         group.add(flywheel);
         const fw2 = flywheel.clone(); fw2.position.z -= 0.12; group.add(fw2);
     } else {
-        const flywheel = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.06, 20), matShooter);
+        const flywheel = new Mesh(new CylinderGeometry(0.12, 0.12, 0.06, 20), matShooter);
         flywheel.position.set(sp.x, sp.y, sp.z);
         flywheel.castShadow = true;
         group.add(flywheel);
         const fw2 = flywheel.clone(); fw2.position.z += 0.12; group.add(fw2);
         
-        const sFrame = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.15, 0.25), new THREE.MeshStandardMaterial({ color: COLORS.shooter, transparent: true, opacity: 0.6 }));
+        const sFrame = new Mesh(new BoxGeometry(0.08, 0.15, 0.25), new MeshStandardMaterial({ color: COLORS.shooter, transparent: true, opacity: 0.6 }));
         sFrame.position.set(sp.x, sp.y, sp.z + 0.06);
         group.add(sFrame);
     }
@@ -451,7 +504,7 @@ export function update3DModel(type, state) {
             },
             undefined,
             () => {
-                const body = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.1, 0.75), mat(COLORS.chassis));
+                const body = new Mesh(new BoxGeometry(0.85, 0.1, 0.75), mat(COLORS.chassis));
                 body.position.y = POSITIONS.chassis.y;
                 body.castShadow = true;
                 grp.add(body);
@@ -470,7 +523,7 @@ export function update3DModel(type, state) {
             undefined,
             () => {
                 const ep = POSITIONS.elevator;
-                const rail = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.9, 0.08), mat(COLORS.elevator));
+                const rail = new Mesh(new BoxGeometry(0.08, 0.9, 0.08), mat(COLORS.elevator));
                 rail.position.set(ep.x - 0.08, ep.y, ep.z);
                 rail.castShadow = true;
                 grp.add(rail);
@@ -517,7 +570,7 @@ export function update3DModel(type, state) {
             undefined,
             () => {
                 const vp = POSITIONS.vision;
-                const cam = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.06, 0.06), mat(COLORS.vision));
+                const cam = new Mesh(new BoxGeometry(0.08, 0.06, 0.06), mat(COLORS.vision));
                 cam.position.set(vp.x, vp.y, vp.z);
                 cam.castShadow = true;
                 grp.add(cam);
@@ -525,18 +578,18 @@ export function update3DModel(type, state) {
         );
     } else if (type === 'roller') {
         const rp = POSITIONS.roller;
-        const plate = new THREE.Mesh(new THREE.BoxGeometry(0.82, 0.06, 0.72), mat(COLORS.roller));
+        const plate = new Mesh(new BoxGeometry(0.82, 0.06, 0.72), mat(COLORS.roller));
         plate.position.set(rp.x, rp.y, rp.z);
         plate.castShadow = true;
         grp.add(plate);
-        const edge = new THREE.Mesh(new THREE.BoxGeometry(0.84, 0.02, 0.74), mat(0x4e4e78, 0.7));
+        const edge = new Mesh(new BoxGeometry(0.84, 0.02, 0.74), mat(0x4e4e78, 0.7));
         edge.position.set(rp.x, rp.y + 0.04, rp.z);
         grp.add(edge);
     } else if (type === 'arm') {
         const armConfig = state.mechanisms?.arm || { dof: 2 };
         const dof = Math.min(3, Math.max(1, armConfig.dof || 2));
         const ap = POSITIONS.chassis;
-        const base = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.11, 0.08, 20), mat(0x333333));
+        const base = new Mesh(new CylinderGeometry(0.09, 0.11, 0.08, 20), mat(0x333333));
         base.position.set(ap.x, ap.y + 0.08, ap.z);
         base.castShadow = true;
         grp.add(base);
@@ -548,31 +601,31 @@ export function update3DModel(type, state) {
         // Distinct joint angles so links are visibly articulated.
         const segmentAngles = [-0.45, 0.28, -0.18];
 
-        let anchor = new THREE.Group();
+        let anchor = new Group();
         anchor.position.set(ap.x, ap.y + 0.12, ap.z);
         grp.add(anchor);
 
         for (let i = 0; i < dof; i++) {
-            const seg = new THREE.Group();
+            const seg = new Group();
             anchor.add(seg);
 
-            const joint = new THREE.Mesh(
-                new THREE.CylinderGeometry(segmentWidths[i] * 0.45, segmentWidths[i] * 0.45, segmentDepths[i] * 1.1, 14),
+            const joint = new Mesh(
+                new CylinderGeometry(segmentWidths[i] * 0.45, segmentWidths[i] * 0.45, segmentDepths[i] * 1.1, 14),
                 mat(0x252525)
             );
             joint.rotation.x = Math.PI / 2;
             seg.add(joint);
 
-            const link = new THREE.Mesh(
-                new THREE.BoxGeometry(segmentWidths[i], segmentLengths[i], segmentDepths[i]),
+            const link = new Mesh(
+                new BoxGeometry(segmentWidths[i], segmentLengths[i], segmentDepths[i]),
                 mat(COLORS.accent)
             );
             link.position.set(0, segmentLengths[i] / 2, 0);
             link.castShadow = true;
             seg.add(link);
 
-            const cap = new THREE.Mesh(
-                new THREE.BoxGeometry(segmentWidths[i] * 1.15, 0.022, segmentDepths[i] * 1.15),
+            const cap = new Mesh(
+                new BoxGeometry(segmentWidths[i] * 1.15, 0.022, segmentDepths[i] * 1.15),
                 mat(0x9a5a62, 0.7)
             );
             cap.position.set(0, segmentLengths[i] - 0.03, 0);
@@ -581,7 +634,7 @@ export function update3DModel(type, state) {
             seg.rotation.z = segmentAngles[i];
 
             // Next segment anchor sits at this segment's tip for continuous connection.
-            const nextAnchor = new THREE.Group();
+            const nextAnchor = new Group();
             nextAnchor.position.set(0, segmentLengths[i], 0);
             seg.add(nextAnchor);
             anchor = nextAnchor;
@@ -589,7 +642,7 @@ export function update3DModel(type, state) {
     } else {
         if (type === 'intake') {
             const ip = POSITIONS.intake;
-            const intBody = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.12, 0.5), mat(COLORS.intake));
+            const intBody = new Mesh(new BoxGeometry(0.3, 0.12, 0.5), mat(COLORS.intake));
             intBody.position.set(ip.x, ip.y, ip.z);
             intBody.rotation.z = -0.25;
             intBody.castShadow = true;
@@ -597,12 +650,12 @@ export function update3DModel(type, state) {
         } else if (type === 'launcher') {
             const gp = POSITIONS.launcher;
             [-0.09, 0.09].forEach(dz => {
-                const f = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.18, 0.04), mat(COLORS.launcher));
+                const f = new Mesh(new BoxGeometry(0.03, 0.18, 0.04), mat(COLORS.launcher));
                 f.position.set(gp.x, gp.y, gp.z + dz);
                 f.castShadow = true;
                 grp.add(f);
             });
-            const gBase = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.04, 0.22), mat(COLORS.launcher));
+            const gBase = new Mesh(new BoxGeometry(0.08, 0.04, 0.22), mat(COLORS.launcher));
             gBase.position.set(gp.x, gp.y - 0.1, gp.z);
             grp.add(gBase);
         }

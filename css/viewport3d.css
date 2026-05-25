@@ -12,6 +12,19 @@
     display: block;
 }
 
+.viewport-error {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 16px;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    background: rgba(10, 10, 10, 0.45);
+}
+
 /* Card Toggle Switch (left panel) */
 .card-toggle {
     position: relative;

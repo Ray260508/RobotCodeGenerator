@@ -1,12 +1,16 @@
 /**
  * Particle Background + Toast — no longer handles robot visualization (Three.js does that)
  */
-export function initParticles() {
+export function createParticleController() {
     const canvas = document.getElementById('particle-canvas');
-    if (!canvas) return;
+    if (!canvas) {
+        return { start() {}, stop() {}, destroy() {}, isRunning: false };
+    }
     const ctx = canvas.getContext('2d');
     let particles = [];
-    let animId;
+    let animId = null;
+    let running = false;
+    let destroyed = false;
 
     function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
     function createParticles() {
@@ -19,6 +23,7 @@ export function initParticles() {
         }
     }
     function draw() {
+        if (!running || destroyed) return;
         ctx.clearRect(0,0,canvas.width,canvas.height);
         for (let i=0;i<particles.length;i++) {
             for (let j=i+1;j<particles.length;j++) {
@@ -38,9 +43,40 @@ export function initParticles() {
         });
         animId = requestAnimationFrame(draw);
     }
-    resize(); createParticles(); draw();
-    window.addEventListener('resize', () => { resize(); createParticles(); });
-    return () => cancelAnimationFrame(animId);
+    const onResize = () => { resize(); createParticles(); };
+
+    function start() {
+        if (destroyed || running) return;
+        running = true;
+        resize();
+        createParticles();
+        draw();
+        window.addEventListener('resize', onResize);
+    }
+
+    function stop() {
+        running = false;
+        if (animId) {
+            cancelAnimationFrame(animId);
+            animId = null;
+        }
+        window.removeEventListener('resize', onResize);
+    }
+
+    function destroy() {
+        stop();
+        destroyed = true;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+
+    return {
+        start,
+        stop,
+        destroy,
+        get isRunning() {
+            return running;
+        },
+    };
 }
 
 export function showToast(message, type='info') {
