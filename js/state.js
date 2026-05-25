@@ -262,7 +262,10 @@ class StateManager {
         if (type === 'arm') {
             if (!m?.enabled) return false;
             if (!Array.isArray(m.joints) || m.joints.length < 1) return false;
-            return m.joints.every(j => Array.isArray(j.motors) && j.motors.length > 0 && !!j.motors[0]?.type);
+            if (!Number.isInteger(m.dof) || m.dof < 1) return false;
+            // Arm "apply" should save structural setup (DoF/joints) even before all motor fields are filled.
+            // Strict motor completeness is enforced later by validateConfig() before generation.
+            return m.joints.length === m.dof;
         }
         return !!(m.enabled && m.motors.length > 0 && m.motors[0].type);
     }
