@@ -534,41 +534,57 @@ export function update3DModel(type, state) {
         grp.add(edge);
     } else if (type === 'arm') {
         const armConfig = state.mechanisms?.arm || { dof: 2 };
-        const dof = armConfig.dof || 2;
+        const dof = Math.min(3, Math.max(1, armConfig.dof || 2));
         const ap = POSITIONS.chassis;
         const base = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.11, 0.08, 20), mat(0x333333));
         base.position.set(ap.x, ap.y + 0.08, ap.z);
         base.castShadow = true;
         grp.add(base);
 
-        let chainRoot = new THREE.Group();
-        chainRoot.position.set(ap.x, ap.y + 0.12, ap.z);
-        grp.add(chainRoot);
+        // Largest first arm segment, shortest third segment.
+        const segmentLengths = [0.34, 0.27, 0.2];
+        const segmentWidths = [0.082, 0.066, 0.052];
+        const segmentDepths = [0.082, 0.066, 0.052];
+        // Distinct joint angles so links are visibly articulated.
+        const segmentAngles = [-0.45, 0.28, -0.18];
+
+        let anchor = new THREE.Group();
+        anchor.position.set(ap.x, ap.y + 0.12, ap.z);
+        grp.add(anchor);
 
         for (let i = 0; i < dof; i++) {
-            const length = Math.max(0.18, 0.34 - i * 0.04);
-            const thickness = Math.max(0.04, 0.075 - i * 0.01);
-            const segment = new THREE.Group();
-            chainRoot.add(segment);
+            const seg = new THREE.Group();
+            anchor.add(seg);
 
-            const joint = new THREE.Mesh(new THREE.SphereGeometry(thickness * 0.75, 16, 16), mat(0x262626));
-            segment.add(joint);
+            const joint = new THREE.Mesh(
+                new THREE.CylinderGeometry(segmentWidths[i] * 0.45, segmentWidths[i] * 0.45, segmentDepths[i] * 1.1, 14),
+                mat(0x252525)
+            );
+            joint.rotation.x = Math.PI / 2;
+            seg.add(joint);
 
-            const link = new THREE.Mesh(new THREE.BoxGeometry(thickness, length, thickness), mat(COLORS.accent));
-            link.position.set(0, length / 2, 0);
+            const link = new THREE.Mesh(
+                new THREE.BoxGeometry(segmentWidths[i], segmentLengths[i], segmentDepths[i]),
+                mat(COLORS.accent)
+            );
+            link.position.set(0, segmentLengths[i] / 2, 0);
             link.castShadow = true;
-            segment.add(link);
+            seg.add(link);
 
-            const sidePlate = new THREE.Mesh(new THREE.BoxGeometry(thickness * 1.8, 0.02, thickness * 0.9), mat(0x884455, 0.7));
-            sidePlate.position.set(0, length * 0.68, 0);
-            segment.add(sidePlate);
+            const cap = new THREE.Mesh(
+                new THREE.BoxGeometry(segmentWidths[i] * 1.15, 0.022, segmentDepths[i] * 1.15),
+                mat(0x9a5a62, 0.7)
+            );
+            cap.position.set(0, segmentLengths[i] - 0.03, 0);
+            seg.add(cap);
 
-            segment.rotation.z = -0.35 + i * 0.22;
+            seg.rotation.z = segmentAngles[i];
 
-            const next = new THREE.Group();
-            next.position.set(0, length, 0);
-            segment.add(next);
-            chainRoot = next;
+            // Next segment anchor sits at this segment's tip for continuous connection.
+            const nextAnchor = new THREE.Group();
+            nextAnchor.position.set(0, segmentLengths[i], 0);
+            seg.add(nextAnchor);
+            anchor = nextAnchor;
         }
     } else {
         if (type === 'intake') {

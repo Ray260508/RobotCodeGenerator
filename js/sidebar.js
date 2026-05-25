@@ -22,8 +22,15 @@ function motorSelect(id, sel) { return `<select class="config-select" id="${id}"
 
 const ATTACH_LABELS = { chassis: 'Chassis', elevator: 'Elevator', intake: 'Intake' };
 
-function simulationAttachSelect(type, m, rules) {
-    const targets = rules[type] || ['chassis'];
+function simulationAttachSelect(type, m, rules, state) {
+    const rawTargets = rules[type] || ['chassis'];
+    const targets = rawTargets.filter(t => {
+        if (t === 'chassis') return true;
+        if (t === 'elevator') return !!state.mechanisms?.elevator?.enabled;
+        if (t === 'intake') return !!state.mechanisms?.intake?.enabled;
+        if (state.mechanisms?.[t]) return !!state.mechanisms[t].enabled;
+        return true;
+    });
     const optsHtml = targets.map(t =>
         `<option value="${t}" ${m.attachedTo === t ? 'selected' : ''}>${ATTACH_LABELS[t] || t}</option>`
     ).join('');
@@ -229,7 +236,7 @@ function renderMech(s, title, content, type, name, extra='', extraTop='') {
             <p class="config-hint" style="margin-top:4px;">Used in simulation physics model. Leave blank to use defaults.</p>
         </details>`;
 
-    const simHtml = s.attachmentRules[type] ? simulationAttachSelect(type, m, s.attachmentRules) : '';
+    const simHtml = s.attachmentRules[type] ? simulationAttachSelect(type, m, s.attachmentRules, s) : '';
     content.innerHTML = extraTop + motorsHtml + configHtml + simHtml + gearHtml + physHtml + extra;
 
     // Add motor button
@@ -481,7 +488,7 @@ function renderArm(s, title, content) {
         `;
     }
 
-    html += simulationAttachSelect('arm', m, s.attachmentRules);
+    html += simulationAttachSelect('arm', m, s.attachmentRules, s);
 
     content.innerHTML = html;
 
@@ -591,7 +598,7 @@ function renderStateMachine(s, title, content) {
     const sm = s.statemachine;
     title.textContent = 'STATE MACHINE';
     content.innerHTML = `
-        <a href="https://ray260508.github.io/StateGraphGenerator/" target="_blank" class="btn-primary" style="display:inline-flex;text-decoration:none;justify-content:center;">OPEN STATE GRAPH GENERATOR</a>
+        <a href="https://ray260508.github.io/StateMachineGraph/" target="_blank" class="btn-primary" style="display:inline-flex;text-decoration:none;justify-content:center;">OPEN STATE GRAPH GENERATOR</a>
         <div class="config-hint">Design your state graph externally, then paste JSON below.</div>
         <div class="config-group"><label class="config-label">State Graph JSON</label>
         <textarea class="config-input" id="cfg-sm-json" rows="8" placeholder='{"nodes":[],"edges":[]}' style="resize:vertical;font-family:var(--font-mono);font-size:0.75rem;">${sm.jsonData||''}</textarea></div>
